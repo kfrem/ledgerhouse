@@ -1,0 +1,594 @@
+{
+    "metadata": {
+        "id": "tenant-consultco",
+        "name": "ConsultCo Limited",
+        "vat_registered": true,
+        "departments": [
+            "Tech Consulting",
+            "Strategy",
+            "Operations"
+        ],
+        "currency": "GBP"
+    },
+    "fixtures": {
+        "transactions": [
+            {
+                "type": "ManualJournal",
+                "id": "CC-MJ-001",
+                "date": "2026-06-01",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account": "1200",
+                        "debit": 30000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS"
+                    },
+                    {
+                        "account": "3000",
+                        "debit": 0.0,
+                        "credit": 100.0,
+                        "vat_code": "OS"
+                    },
+                    {
+                        "account": "3200",
+                        "debit": 0.0,
+                        "credit": 29900.0,
+                        "vat_code": "OS"
+                    }
+                ],
+                "approved_by": "Godfred (Accountant)",
+                "status": "Posted"
+            },
+            {
+                "type": "SupplierInvoice",
+                "id": "CC-SI-001",
+                "invoice_number": "AWS-JUNE-99",
+                "supplier": "Amazon Web Services",
+                "date": "2026-06-02",
+                "department": "Tech Consulting",
+                "lines": [
+                    {
+                        "account": "6200",
+                        "description": "Cloud hosting June",
+                        "net": 1200.0,
+                        "vat_code": "SR",
+                        "vat": 240.0
+                    }
+                ],
+                "evidence_link": "/evidence/aws_june_99.pdf",
+                "approved_by": "Manager Strategy Bob",
+                "status": "Posted"
+            },
+            {
+                "type": "SalesInvoice",
+                "id": "CC-VI-001",
+                "invoice_number": "CC-2026-01",
+                "customer": "Vogosphere Corp",
+                "date": "2026-06-10",
+                "department": "Strategy",
+                "lines": [
+                    {
+                        "account": "4000",
+                        "description": "Strategy consulting retainer June",
+                        "net": 10000.0,
+                        "vat_code": "SR",
+                        "vat": 2000.0
+                    }
+                ],
+                "evidence_link": "/evidence/vogo_retainer_june.pdf",
+                "status": "Posted"
+            },
+            {
+                "type": "DirectorTransaction",
+                "id": "CC-DT-001",
+                "director": "Director Sarah",
+                "date": "2026-06-15",
+                "department": "Operations",
+                "lines": [
+                    {
+                        "account": "2400",
+                        "description": "Gym membership paid by company (Sarah DLA)",
+                        "net": 80.0,
+                        "vat_code": "OS",
+                        "vat": 0.0
+                    }
+                ],
+                "evidence_link": "/evidence/gym_receipt.pdf",
+                "status": "RequiresReview"
+            },
+            {
+                "type": "SupplierInvoice",
+                "id": "CC-SI-002",
+                "invoice_number": "APL-33421",
+                "supplier": "Apple Store Business",
+                "date": "2026-06-18",
+                "department": "Tech Consulting",
+                "lines": [
+                    {
+                        "account": "1600",
+                        "description": "MacBook Pro 16 inch (Asset)",
+                        "net": 2000.0,
+                        "vat_code": "SR",
+                        "vat": 400.0
+                    }
+                ],
+                "evidence_link": "/evidence/apple_fa_laptop.pdf",
+                "approved_by": "Director Sarah",
+                "status": "Posted"
+            },
+            {
+                "type": "SupplierInvoice",
+                "id": "CC-SI-003",
+                "invoice_number": "JIRA-ANNUAL-2026",
+                "supplier": "Atlassian Corp",
+                "date": "2026-06-20",
+                "department": "Tech Consulting",
+                "lines": [
+                    {
+                        "account": "1500",
+                        "description": "Jira Annual License July 26 - June 27",
+                        "net": 2400.0,
+                        "vat_code": "SR",
+                        "vat": 480.0
+                    }
+                ],
+                "evidence_link": "/evidence/atlassian_jira_annual.pdf",
+                "approved_by": "Director Sarah",
+                "status": "Posted"
+            },
+            {
+                "type": "ManualJournal",
+                "id": "CC-MJ-002",
+                "date": "2026-06-30",
+                "description": "Accrued accounting fees for June 2026",
+                "lines": [
+                    {
+                        "account": "6400",
+                        "debit": 500.0,
+                        "credit": 0.0,
+                        "vat_code": "OS"
+                    },
+                    {
+                        "account": "2300",
+                        "debit": 0.0,
+                        "credit": 500.0,
+                        "vat_code": "OS"
+                    }
+                ],
+                "approved_by": "Godfred (Accountant)",
+                "status": "Posted"
+            }
+        ],
+        "bank_statement": [
+            {
+                "date": "2026-06-05",
+                "amount": -1440.0,
+                "reference": "AWS SUBSCRIPTION",
+                "fitid": "FITID-CC-001",
+                "matched_to": "CC-SI-001"
+            },
+            {
+                "date": "2026-06-15",
+                "amount": 12000.0,
+                "reference": "VOGOSPHERE INVOICE CC-2026-01",
+                "fitid": "FITID-CC-002",
+                "matched_to": "CC-VI-001"
+            },
+            {
+                "date": "2026-06-16",
+                "amount": -80.0,
+                "reference": " Sarah Gym card payment",
+                "fitid": "FITID-CC-003",
+                "matched_to": "CC-DT-001"
+            },
+            {
+                "date": "2026-06-22",
+                "amount": -2400.0,
+                "reference": "APPLE ONLINE STORE",
+                "fitid": "FITID-CC-004",
+                "matched_to": "CC-SI-002"
+            },
+            {
+                "date": "2026-06-25",
+                "amount": -2880.0,
+                "reference": "ATLASSIAN JIRA",
+                "fitid": "FITID-CC-005",
+                "matched_to": "CC-SI-003"
+            }
+        ]
+    },
+    "expected_results": {
+        "journal_postings": [
+            {
+                "source_id": "CC-MJ-001",
+                "date": "2026-06-01",
+                "type": "ManualJournal",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 30000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "3000",
+                        "debit": 0.0,
+                        "credit": 100.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "3200",
+                        "debit": 0.0,
+                        "credit": 29900.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    }
+                ]
+            },
+            {
+                "source_id": "CC-SI-001",
+                "date": "2026-06-02",
+                "type": "SupplierInvoice",
+                "description": "Purchase from Amazon Web Services - Inv AWS-JUNE-99",
+                "lines": [
+                    {
+                        "account_code": "6200",
+                        "debit": 1200.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Tech Consulting"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 240.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Tech Consulting"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 1440.0,
+                        "vat_code": "OS",
+                        "department": "Tech Consulting"
+                    }
+                ]
+            },
+            {
+                "source_id": "CC-VI-001",
+                "date": "2026-06-10",
+                "type": "SalesInvoice",
+                "description": "Sale to Vogosphere Corp - Inv CC-2026-01",
+                "lines": [
+                    {
+                        "account_code": "4000",
+                        "debit": 0.0,
+                        "credit": 10000.0,
+                        "vat_code": "SR",
+                        "department": "Strategy"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 0.0,
+                        "credit": 2000.0,
+                        "vat_code": "SR",
+                        "department": "Strategy"
+                    },
+                    {
+                        "account_code": "1100",
+                        "debit": 12000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Strategy"
+                    }
+                ]
+            },
+            {
+                "source_id": "CC-DT-001",
+                "date": "2026-06-15",
+                "type": "DirectorTransaction",
+                "description": "Director transaction: Director Sarah personal gym",
+                "lines": [
+                    {
+                        "account_code": "2400",
+                        "debit": 80.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Operations"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 80.0,
+                        "vat_code": "OS",
+                        "department": "Operations"
+                    }
+                ]
+            },
+            {
+                "source_id": "CC-SI-002",
+                "date": "2026-06-18",
+                "type": "SupplierInvoice",
+                "description": "Purchase from Apple Store Business - Inv APL-33421",
+                "lines": [
+                    {
+                        "account_code": "1600",
+                        "debit": 2000.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Tech Consulting"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 400.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Tech Consulting"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 2400.0,
+                        "vat_code": "OS",
+                        "department": "Tech Consulting"
+                    }
+                ]
+            },
+            {
+                "source_id": "CC-SI-003",
+                "date": "2026-06-20",
+                "type": "SupplierInvoice",
+                "description": "Purchase from Atlassian Corp - Inv JIRA-ANNUAL-2026",
+                "lines": [
+                    {
+                        "account_code": "1500",
+                        "debit": 2400.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Tech Consulting"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 480.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Tech Consulting"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 2880.0,
+                        "vat_code": "OS",
+                        "department": "Tech Consulting"
+                    }
+                ]
+            },
+            {
+                "source_id": "CC-MJ-002",
+                "date": "2026-06-30",
+                "type": "ManualJournal",
+                "description": "Accrued accounting fees for June 2026",
+                "lines": [
+                    {
+                        "account_code": "6400",
+                        "debit": 500.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "2300",
+                        "debit": 0.0,
+                        "credit": 500.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-PAY-FITID-CC-001",
+                "date": "2026-06-05",
+                "type": "BankPayment",
+                "description": "Bank payment match: AWS SUBSCRIPTION",
+                "lines": [
+                    {
+                        "account_code": "2100",
+                        "debit": 1440.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Tech Consulting"
+                    },
+                    {
+                        "account_code": "1200",
+                        "debit": 0.0,
+                        "credit": 1440.0,
+                        "vat_code": "OS",
+                        "department": "Tech Consulting"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-REC-FITID-CC-002",
+                "date": "2026-06-15",
+                "type": "BankReceipt",
+                "description": "Bank receipt match: VOGOSPHERE INVOICE CC-2026-01",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 12000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Strategy"
+                    },
+                    {
+                        "account_code": "1100",
+                        "debit": 0.0,
+                        "credit": 12000.0,
+                        "vat_code": "OS",
+                        "department": "Strategy"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-PAY-FITID-CC-003",
+                "date": "2026-06-16",
+                "type": "BankPayment",
+                "description": "Bank payment match:  Sarah Gym card payment",
+                "lines": [
+                    {
+                        "account_code": "2100",
+                        "debit": 80.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Operations"
+                    },
+                    {
+                        "account_code": "1200",
+                        "debit": 0.0,
+                        "credit": 80.0,
+                        "vat_code": "OS",
+                        "department": "Operations"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-PAY-FITID-CC-004",
+                "date": "2026-06-22",
+                "type": "BankPayment",
+                "description": "Bank payment match: APPLE ONLINE STORE",
+                "lines": [
+                    {
+                        "account_code": "2100",
+                        "debit": 2400.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Tech Consulting"
+                    },
+                    {
+                        "account_code": "1200",
+                        "debit": 0.0,
+                        "credit": 2400.0,
+                        "vat_code": "OS",
+                        "department": "Tech Consulting"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-PAY-FITID-CC-005",
+                "date": "2026-06-25",
+                "type": "BankPayment",
+                "description": "Bank payment match: ATLASSIAN JIRA",
+                "lines": [
+                    {
+                        "account_code": "2100",
+                        "debit": 2880.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Tech Consulting"
+                    },
+                    {
+                        "account_code": "1200",
+                        "debit": 0.0,
+                        "credit": 2880.0,
+                        "vat_code": "OS",
+                        "department": "Tech Consulting"
+                    }
+                ]
+            }
+        ],
+        "trial_balance": {
+            "1200": 35200.0,
+            "1210": 0.0,
+            "1500": 2400.0,
+            "1600": 2000.0,
+            "1601": 0.0,
+            "2100": 0.0,
+            "2200": -880.0,
+            "2300": -500.0,
+            "2400": 80.0,
+            "3000": -100.0,
+            "3200": -29900.0,
+            "4000": -10000.0,
+            "4010": 0.0,
+            "4020": 0.0,
+            "5000": 0.0,
+            "5100": 0.0,
+            "6000": 0.0,
+            "6100": 0.0,
+            "6200": 1200.0,
+            "6300": 0.0,
+            "6310": 0.0,
+            "6400": 500.0,
+            "6500": 0.0,
+            "6600": 0.0,
+            "1100": 0.0
+        },
+        "profit_and_loss": {
+            "4000": 10000.0,
+            "4010": -0.0,
+            "4020": -0.0,
+            "5000": 0.0,
+            "5100": 0.0,
+            "6000": 0.0,
+            "6100": 0.0,
+            "6200": 1200.0,
+            "6300": 0.0,
+            "6310": 0.0,
+            "6400": 500.0,
+            "6500": 0.0,
+            "6600": 0.0
+        },
+        "balance_sheet": {
+            "1200": 35200.0,
+            "1210": 0.0,
+            "1500": 2400.0,
+            "1600": 2000.0,
+            "1601": 0.0,
+            "2100": 0.0,
+            "2200": -880.0,
+            "2300": -500.0,
+            "2400": 80.0,
+            "3000": -100.0,
+            "3200": -21600.0,
+            "1100": 0.0
+        },
+        "vat_summary": {
+            "output_vat": 2000.0,
+            "input_vat": 1120.0,
+            "net_vat_payable": 880.0
+        },
+        "departmental_pnl": {
+            "Tech Consulting": {
+                "Revenue": 0.0,
+                "Cost of Sales": 0.0,
+                "Expense": 1200.0,
+                "Net": -1200.0
+            },
+            "Strategy": {
+                "Revenue": 10000.0,
+                "Cost of Sales": 0.0,
+                "Expense": 0.0,
+                "Net": 10000.0
+            },
+            "Operations": {
+                "Revenue": 0.0,
+                "Cost of Sales": 0.0,
+                "Expense": 0.0,
+                "Net": 0.0
+            },
+            "Head Office": {
+                "Revenue": 0.0,
+                "Cost of Sales": 0.0,
+                "Expense": 500.0,
+                "Net": -500.0
+            }
+        },
+        "reconciled_bank_balance": 5200.0,
+        "expected_debtors_balance": 0.0,
+        "expected_creditors_balance": -0.0
+    }
+}

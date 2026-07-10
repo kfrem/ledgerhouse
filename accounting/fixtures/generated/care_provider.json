@@ -1,0 +1,682 @@
+{
+    "metadata": {
+        "id": "tenant-careco",
+        "name": "CareCo Limited",
+        "vat_registered": true,
+        "departments": [
+            "Residential",
+            "Domiciliary",
+            "Head Office"
+        ],
+        "currency": "GBP"
+    },
+    "fixtures": {
+        "transactions": [
+            {
+                "type": "ManualJournal",
+                "id": "CP-MJ-001",
+                "date": "2026-06-01",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account": "1200",
+                        "debit": 50000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS"
+                    },
+                    {
+                        "account": "3000",
+                        "debit": 0.0,
+                        "credit": 1000.0,
+                        "vat_code": "OS"
+                    },
+                    {
+                        "account": "3200",
+                        "debit": 0.0,
+                        "credit": 49000.0,
+                        "vat_code": "OS"
+                    }
+                ],
+                "approved_by": "Godfred (Accountant)",
+                "status": "Posted"
+            },
+            {
+                "type": "SupplierInvoice",
+                "id": "CP-SI-001",
+                "invoice_number": "RENT-JUNE",
+                "supplier": "Lumina Properties Ltd",
+                "date": "2026-06-01",
+                "department": "Head Office",
+                "lines": [
+                    {
+                        "account": "6000",
+                        "description": "June 2026 Office Rent",
+                        "net": 5000.0,
+                        "vat_code": "SR",
+                        "vat": 1000.0
+                    }
+                ],
+                "evidence_link": "/evidence/lumina_rent_june_2026.pdf",
+                "approved_by": "Director Jane",
+                "status": "Posted"
+            },
+            {
+                "type": "SupplierInvoice",
+                "id": "CP-SI-002",
+                "invoice_number": "AG-10023",
+                "supplier": "CareStaff Specialists",
+                "date": "2026-06-05",
+                "department": "Residential",
+                "lines": [
+                    {
+                        "account": "5000",
+                        "description": "Agency nurse cover w/e June 5",
+                        "net": 12000.0,
+                        "vat_code": "EX",
+                        "vat": 0.0
+                    }
+                ],
+                "evidence_link": "/evidence/carestaff_ag_10023.pdf",
+                "approved_by": "Director Jane",
+                "status": "Posted"
+            },
+            {
+                "type": "SupplierInvoice",
+                "id": "CP-SI-003",
+                "invoice_number": "POW-9921",
+                "supplier": "British Gas Business",
+                "date": "2026-06-10",
+                "department": "Domiciliary",
+                "lines": [
+                    {
+                        "account": "6100",
+                        "description": "Power usage June",
+                        "net": 400.0,
+                        "vat_code": "RR",
+                        "vat": 20.0
+                    }
+                ],
+                "evidence_link": "/evidence/gas_pow_9921.pdf",
+                "approved_by": "Manager Dave",
+                "status": "Posted"
+            },
+            {
+                "type": "SalesInvoice",
+                "id": "CP-VI-001",
+                "invoice_number": "CP-2026-001",
+                "customer": "Kent County Council",
+                "date": "2026-06-15",
+                "department": "Domiciliary",
+                "lines": [
+                    {
+                        "account": "4020",
+                        "description": "Domiciliary Care Packages June",
+                        "net": 25000.0,
+                        "vat_code": "EX",
+                        "vat": 0.0
+                    }
+                ],
+                "evidence_link": "/evidence/kcc_invoice_june.pdf",
+                "status": "Posted"
+            },
+            {
+                "type": "SalesInvoice",
+                "id": "CP-VI-002",
+                "invoice_number": "CP-2026-002",
+                "customer": "Family of Arthur Dent",
+                "date": "2026-06-16",
+                "department": "Residential",
+                "lines": [
+                    {
+                        "account": "4020",
+                        "description": "Residential Care Fees June",
+                        "net": 8000.0,
+                        "vat_code": "EX",
+                        "vat": 0.0
+                    }
+                ],
+                "evidence_link": "/evidence/dent_fees_june.pdf",
+                "status": "Posted"
+            },
+            {
+                "type": "SalesCreditNote",
+                "id": "CP-CN-001",
+                "credit_note_number": "CP-2026-CN01",
+                "original_invoice": "CP-2026-001",
+                "customer": "Kent County Council",
+                "date": "2026-06-18",
+                "department": "Domiciliary",
+                "lines": [
+                    {
+                        "account": "4020",
+                        "description": "Rebate for cancelled care hours",
+                        "net": 1500.0,
+                        "vat_code": "EX",
+                        "vat": 0.0
+                    }
+                ],
+                "evidence_link": "/evidence/kcc_credit_note.pdf",
+                "approved_by": "Director Jane",
+                "status": "Posted"
+            },
+            {
+                "type": "EmployeeExpense",
+                "id": "CP-EE-001",
+                "claimant": "Staff John",
+                "date": "2026-06-20",
+                "department": "Domiciliary",
+                "lines": [
+                    {
+                        "account": "6310",
+                        "description": "Mileage reimbursement for home visits",
+                        "net": 120.0,
+                        "vat_code": "OS",
+                        "vat": 0.0
+                    }
+                ],
+                "evidence_link": "/evidence/john_mileage_june.pdf",
+                "approved_by": "Manager Dave",
+                "status": "Posted"
+            },
+            {
+                "type": "BankCharge",
+                "id": "CP-BC-001",
+                "date": "2026-06-30",
+                "department": "Head Office",
+                "lines": [
+                    {
+                        "account": "6500",
+                        "description": "Monthly Bank Fee",
+                        "net": 25.0,
+                        "vat_code": "EX",
+                        "vat": 0.0
+                    }
+                ],
+                "status": "Posted"
+            }
+        ],
+        "bank_statement": [
+            {
+                "date": "2026-06-02",
+                "amount": -6000.0,
+                "reference": "LUMINA RENT JUNE",
+                "fitid": "FITID-CP-001",
+                "matched_to": "CP-SI-001"
+            },
+            {
+                "date": "2026-06-20",
+                "amount": 20000.0,
+                "reference": "KENT COUNTY COUNCIL REC",
+                "fitid": "FITID-CP-002",
+                "matched_to": "CP-VI-001"
+            },
+            {
+                "date": "2026-06-22",
+                "amount": 8500.0,
+                "reference": "DENT RES CARE FEES",
+                "fitid": "FITID-CP-003",
+                "matched_to": "CP-VI-002"
+            },
+            {
+                "date": "2026-06-25",
+                "amount": -12000.0,
+                "reference": "CARESTAFF SPEC",
+                "fitid": "FITID-CP-004",
+                "matched_to": "CP-SI-002"
+            },
+            {
+                "date": "2026-06-26",
+                "amount": -120.0,
+                "reference": "EXPENSE REIMB JOHN",
+                "fitid": "FITID-CP-005",
+                "matched_to": "CP-EE-001"
+            },
+            {
+                "date": "2026-06-30",
+                "amount": -25.0,
+                "reference": "MONTHLY ACCOUNT FEE",
+                "fitid": "FITID-CP-006",
+                "matched_to": "CP-BC-001"
+            }
+        ]
+    },
+    "expected_results": {
+        "journal_postings": [
+            {
+                "source_id": "CP-MJ-001",
+                "date": "2026-06-01",
+                "type": "ManualJournal",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 50000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "3000",
+                        "debit": 0.0,
+                        "credit": 1000.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "3200",
+                        "debit": 0.0,
+                        "credit": 49000.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    }
+                ]
+            },
+            {
+                "source_id": "CP-SI-001",
+                "date": "2026-06-01",
+                "type": "SupplierInvoice",
+                "description": "Purchase from Lumina Properties Ltd - Inv RENT-JUNE",
+                "lines": [
+                    {
+                        "account_code": "6000",
+                        "debit": 5000.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 1000.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 6000.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    }
+                ]
+            },
+            {
+                "source_id": "CP-SI-002",
+                "date": "2026-06-05",
+                "type": "SupplierInvoice",
+                "description": "Purchase from CareStaff Specialists - Inv AG-10023",
+                "lines": [
+                    {
+                        "account_code": "5000",
+                        "debit": 12000.0,
+                        "credit": 0.0,
+                        "vat_code": "EX",
+                        "department": "Residential"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 12000.0,
+                        "vat_code": "OS",
+                        "department": "Residential"
+                    }
+                ]
+            },
+            {
+                "source_id": "CP-SI-003",
+                "date": "2026-06-10",
+                "type": "SupplierInvoice",
+                "description": "Purchase from British Gas Business - Inv POW-9921",
+                "lines": [
+                    {
+                        "account_code": "6100",
+                        "debit": 400.0,
+                        "credit": 0.0,
+                        "vat_code": "RR",
+                        "department": "Domiciliary"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 20.0,
+                        "credit": 0.0,
+                        "vat_code": "RR",
+                        "department": "Domiciliary"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 420.0,
+                        "vat_code": "OS",
+                        "department": "Domiciliary"
+                    }
+                ]
+            },
+            {
+                "source_id": "CP-VI-001",
+                "date": "2026-06-15",
+                "type": "SalesInvoice",
+                "description": "Sale to Kent County Council - Inv CP-2026-001",
+                "lines": [
+                    {
+                        "account_code": "4020",
+                        "debit": 0.0,
+                        "credit": 25000.0,
+                        "vat_code": "EX",
+                        "department": "Domiciliary"
+                    },
+                    {
+                        "account_code": "1100",
+                        "debit": 25000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Domiciliary"
+                    }
+                ]
+            },
+            {
+                "source_id": "CP-VI-002",
+                "date": "2026-06-16",
+                "type": "SalesInvoice",
+                "description": "Sale to Family of Arthur Dent - Inv CP-2026-002",
+                "lines": [
+                    {
+                        "account_code": "4020",
+                        "debit": 0.0,
+                        "credit": 8000.0,
+                        "vat_code": "EX",
+                        "department": "Residential"
+                    },
+                    {
+                        "account_code": "1100",
+                        "debit": 8000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Residential"
+                    }
+                ]
+            },
+            {
+                "source_id": "CP-CN-001",
+                "date": "2026-06-18",
+                "type": "SalesCreditNote",
+                "description": "Credit note to Kent County Council - Ref CP-2026-CN01",
+                "lines": [
+                    {
+                        "account_code": "4020",
+                        "debit": 1500.0,
+                        "credit": 0.0,
+                        "vat_code": "EX",
+                        "department": "Domiciliary"
+                    },
+                    {
+                        "account_code": "1100",
+                        "debit": 0.0,
+                        "credit": 1500.0,
+                        "vat_code": "OS",
+                        "department": "Domiciliary"
+                    }
+                ]
+            },
+            {
+                "source_id": "CP-EE-001",
+                "date": "2026-06-20",
+                "type": "EmployeeExpense",
+                "description": "Expense claim from Staff John",
+                "lines": [
+                    {
+                        "account_code": "6310",
+                        "debit": 120.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Domiciliary"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 120.0,
+                        "vat_code": "OS",
+                        "department": "Domiciliary"
+                    }
+                ]
+            },
+            {
+                "source_id": "CP-BC-001",
+                "date": "2026-06-30",
+                "type": "BankCharge",
+                "description": "Bank monthly charge",
+                "lines": [
+                    {
+                        "account_code": "6500",
+                        "debit": 25.0,
+                        "credit": 0.0,
+                        "vat_code": "EX",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 25.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-PAY-FITID-CP-001",
+                "date": "2026-06-02",
+                "type": "BankPayment",
+                "description": "Bank payment match: LUMINA RENT JUNE",
+                "lines": [
+                    {
+                        "account_code": "2100",
+                        "debit": 6000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "1200",
+                        "debit": 0.0,
+                        "credit": 6000.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-REC-FITID-CP-002",
+                "date": "2026-06-20",
+                "type": "BankReceipt",
+                "description": "Bank receipt match: KENT COUNTY COUNCIL REC",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 20000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Domiciliary"
+                    },
+                    {
+                        "account_code": "1100",
+                        "debit": 0.0,
+                        "credit": 20000.0,
+                        "vat_code": "OS",
+                        "department": "Domiciliary"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-REC-FITID-CP-003",
+                "date": "2026-06-22",
+                "type": "BankReceipt",
+                "description": "Bank receipt match: DENT RES CARE FEES",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 8500.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Residential"
+                    },
+                    {
+                        "account_code": "1100",
+                        "debit": 0.0,
+                        "credit": 8500.0,
+                        "vat_code": "OS",
+                        "department": "Residential"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-PAY-FITID-CP-004",
+                "date": "2026-06-25",
+                "type": "BankPayment",
+                "description": "Bank payment match: CARESTAFF SPEC",
+                "lines": [
+                    {
+                        "account_code": "2100",
+                        "debit": 12000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Residential"
+                    },
+                    {
+                        "account_code": "1200",
+                        "debit": 0.0,
+                        "credit": 12000.0,
+                        "vat_code": "OS",
+                        "department": "Residential"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-PAY-FITID-CP-005",
+                "date": "2026-06-26",
+                "type": "BankPayment",
+                "description": "Bank payment match: EXPENSE REIMB JOHN",
+                "lines": [
+                    {
+                        "account_code": "2100",
+                        "debit": 120.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Domiciliary"
+                    },
+                    {
+                        "account_code": "1200",
+                        "debit": 0.0,
+                        "credit": 120.0,
+                        "vat_code": "OS",
+                        "department": "Domiciliary"
+                    }
+                ]
+            },
+            {
+                "source_id": "BANK-PAY-FITID-CP-006",
+                "date": "2026-06-30",
+                "type": "BankPayment",
+                "description": "Bank payment match: MONTHLY ACCOUNT FEE",
+                "lines": [
+                    {
+                        "account_code": "2100",
+                        "debit": 25.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    },
+                    {
+                        "account_code": "1200",
+                        "debit": 0.0,
+                        "credit": 25.0,
+                        "vat_code": "OS",
+                        "department": "Head Office"
+                    }
+                ]
+            }
+        ],
+        "trial_balance": {
+            "1200": 60355.0,
+            "1210": 0.0,
+            "1500": 0.0,
+            "1600": 0.0,
+            "1601": 0.0,
+            "2100": -420.0,
+            "2200": 1020.0,
+            "2300": 0.0,
+            "2400": 0.0,
+            "3000": -1000.0,
+            "3200": -49000.0,
+            "4000": 0.0,
+            "4010": 0.0,
+            "4020": -31500.0,
+            "5000": 12000.0,
+            "5100": 0.0,
+            "6000": 5000.0,
+            "6100": 400.0,
+            "6200": 0.0,
+            "6300": 0.0,
+            "6310": 120.0,
+            "6400": 0.0,
+            "6500": 25.0,
+            "6600": 0.0,
+            "1100": 3000.0
+        },
+        "profit_and_loss": {
+            "4000": -0.0,
+            "4010": -0.0,
+            "4020": 31500.0,
+            "5000": 12000.0,
+            "5100": 0.0,
+            "6000": 5000.0,
+            "6100": 400.0,
+            "6200": 0.0,
+            "6300": 0.0,
+            "6310": 120.0,
+            "6400": 0.0,
+            "6500": 25.0,
+            "6600": 0.0
+        },
+        "balance_sheet": {
+            "1200": 60355.0,
+            "1210": 0.0,
+            "1500": 0.0,
+            "1600": 0.0,
+            "1601": 0.0,
+            "2100": -420.0,
+            "2200": 1020.0,
+            "2300": 0.0,
+            "2400": 0.0,
+            "3000": -1000.0,
+            "3200": -35045.0,
+            "1100": 3000.0
+        },
+        "vat_summary": {
+            "output_vat": 0.0,
+            "input_vat": 1020.0,
+            "net_vat_payable": -1020.0
+        },
+        "departmental_pnl": {
+            "Residential": {
+                "Revenue": 8000.0,
+                "Cost of Sales": 12000.0,
+                "Expense": 0.0,
+                "Net": -4000.0
+            },
+            "Domiciliary": {
+                "Revenue": 23500.0,
+                "Cost of Sales": 0.0,
+                "Expense": 520.0,
+                "Net": 22980.0
+            },
+            "Head Office": {
+                "Revenue": 0.0,
+                "Cost of Sales": 0.0,
+                "Expense": 5025.0,
+                "Net": -5025.0
+            }
+        },
+        "reconciled_bank_balance": 10355.0,
+        "expected_debtors_balance": 3000.0,
+        "expected_creditors_balance": 420.0
+    }
+}

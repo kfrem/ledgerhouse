@@ -1,0 +1,127 @@
+{
+    "rejection_scenarios": [
+        {
+            "id": "REJ-001",
+            "scenario": "Closed period edit attempt",
+            "input": {
+                "action": "edit",
+                "period": "2026-05",
+                "journal_id": "CP-MJ-001",
+                "payload": {
+                    "description": "Illegal post-close edit"
+                }
+            },
+            "expected_result": "Rejected",
+            "expected_message": "Cannot modify transactions in a closed accounting period."
+        },
+        {
+            "id": "REJ-002",
+            "scenario": "Cross-tenant access attempt",
+            "input": {
+                "user_role": "tenant_staff",
+                "user_tenant": "tenant-consultco",
+                "target_tenant": "tenant-careco",
+                "action": "view_journal",
+                "target_id": "CP-MJ-001"
+            },
+            "expected_result": "Rejected",
+            "expected_message": "Access denied. Tenant isolation boundary violated."
+        },
+        {
+            "id": "REJ-003",
+            "scenario": "Self-approval of restricted claim",
+            "input": {
+                "user": "Staff John",
+                "claim_id": "CP-EE-001",
+                "action": "approve",
+                "claimant": "Staff John"
+            },
+            "expected_result": "Rejected",
+            "expected_message": "Users are not permitted to approve their own expense claims or invoices."
+        },
+        {
+            "id": "REJ-004",
+            "scenario": "Unbalanced manual journal entry",
+            "input": {
+                "type": "ManualJournal",
+                "date": "2026-06-15",
+                "lines": [
+                    {
+                        "account": "1200",
+                        "debit": 100.0,
+                        "credit": 0.0
+                    },
+                    {
+                        "account": "3200",
+                        "debit": 0.0,
+                        "credit": 99.0
+                    }
+                ]
+            },
+            "expected_result": "Rejected",
+            "expected_message": "Journal is unbalanced. Total debits must equal total credits."
+        },
+        {
+            "id": "REJ-005",
+            "scenario": "Duplicate CSV bank statement import fitid",
+            "input": {
+                "action": "import_csv",
+                "rows": [
+                    {
+                        "date": "2026-06-20",
+                        "amount": 5400.0,
+                        "reference": "MEGACORP UK INVOICE TC-2026-101",
+                        "fitid": "FITID-TC-002"
+                    }
+                ]
+            },
+            "expected_result": "IgnoredDuplicate",
+            "expected_message": "Transaction FITID-TC-002 already imported. Skipping to maintain idempotency."
+        },
+        {
+            "id": "REJ-006",
+            "scenario": "Malformed bank CSV columns",
+            "input": {
+                "action": "import_csv",
+                "csv_data": "WrongHeader1,WrongHeader2\n2026-06-20,5400.00"
+            },
+            "expected_result": "Rejected",
+            "expected_message": "Invalid CSV file format. Required headers: Date, Amount, Reference, FITID are missing."
+        }
+    ],
+    "companies_metadata": {
+        "care_provider": {
+            "id": "tenant-careco",
+            "name": "CareCo Limited",
+            "vat_registered": true,
+            "departments": [
+                "Residential",
+                "Domiciliary",
+                "Head Office"
+            ],
+            "currency": "GBP"
+        },
+        "consultancy": {
+            "id": "tenant-consultco",
+            "name": "ConsultCo Limited",
+            "vat_registered": true,
+            "departments": [
+                "Tech Consulting",
+                "Strategy",
+                "Operations"
+            ],
+            "currency": "GBP"
+        },
+        "trading_company": {
+            "id": "tenant-tradeco",
+            "name": "TradeCo Limited",
+            "vat_registered": true,
+            "departments": [
+                "Sales",
+                "Logistics",
+                "Operations"
+            ],
+            "currency": "GBP"
+        }
+    }
+}
