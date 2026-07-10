@@ -43,3 +43,15 @@ Format:
 - Security/data implications: Configured RLS on VatRate and VatDecisionRule tables. Restricted permissions to `ledger_tenant_role`.
 - Known limitations or blockers: None.
 - Exact next task for the next agent: Proceed to Stage 3: Controlled CSV bank import (PLAN.md Section 6.2, Wk 12–14). Implement the CSV bank statement import process with structured schema, duplicate prevention by hash, date, amount, reference, and safe error handling.
+
+## 2026-07-10 | agent: Gemini | branch: stage-3-import
+- Task attempted: Stage 3 Controlled CSV Bank Import. Configured ImportedFile and BankTransaction models, enabled/forced RLS, granted role permissions, and implemented bank CSV parsing, SHA-256 file hashing, header validation, and line-level idempotency skipping. Created unit tests verifying parsing, file deduplication, line idempotency, parsing exceptions rollback, and RLS isolation on bank records.
+- Files touched:
+  - Modify: [STATE.md](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/STATE.md), [BUILDLOG.md](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/BUILDLOG.md), [accounting/models.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/models.py)
+  - Create: [accounting/bank_import.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/bank_import.py), [accounting/migrations/0003_importedfile_banktransaction.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/migrations/0003_importedfile_banktransaction.py), [accounting/tests/test_bank_import.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/tests/test_bank_import.py)
+- Tests run and result: Run `pytest` locally (22 passed, 5 skipped on SQLite fallback) and `docker compose run --rm web pytest` inside container (27 passed, 100% green). Verification succeeds for file parsing, deduplication, row-level idempotency skipping, validation failures transaction rollback, and RLS isolation.
+- Stage-gate status: Stage 3 complete and verified. All gate checklists met.
+- Commit hash: 7f9f180
+- Security/data implications: Configured RLS on ImportedFile and BankTransaction tables. Restricted permissions to `ledger_tenant_role`.
+- Known limitations or blockers: None.
+- Exact next task for the next agent: Proceed to Stage 4: Purchase ledger and evidence capture (PLAN.md Section 6.2, Wk 15–18). Implement the purchase ledger journal postings, document attachments/evidence linking, correction journal reversals, and tracking of review counts for matching states.

@@ -107,3 +107,34 @@ class VatDecisionRule(models.Model):
 
     def __str__(self):
         return f"Rule {self.id}: Supplier '{self.supplier_name_pattern}', Account '{self.account_code_pattern}' -> {self.vat_code}"
+
+
+class ImportedFile(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    filename = models.CharField(max_length=255)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    raw_content = models.TextField()
+    file_hash = models.CharField(max_length=64)
+
+    class Meta:
+        unique_together = ('tenant', 'file_hash')
+
+    def __str__(self):
+        return f"{self.filename} uploaded at {self.uploaded_at}"
+
+
+class BankTransaction(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    imported_file = models.ForeignKey(ImportedFile, on_delete=models.CASCADE)
+    date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    reference = models.CharField(max_length=255)
+    fitid = models.CharField(max_length=100)
+
+    class Meta:
+        unique_together = ('tenant', 'fitid')
+
+    def __str__(self):
+        return f"BankTx {self.fitid}: {self.date} {self.amount} {self.reference}"

@@ -1,0 +1,106 @@
+import csv
+import hashlib
+import io
+from decimal import Decimal
+from datetime import datetime
+from django.db import transaction
+from .models import ImportedFile, BankTransaction
+
+
+def import_bank_csv(tenant, filename, csv_text):
+    """
+    Imports a bank CSV file transactionally.
+    Validates headers, calculates a SHA-256 hash to prevent identical file imports,
+    and skips individual rows that match existing FITIDs to ensure transaction-level idempotency.
+    """
+    # 1. Calculate SHA-256 hash of the raw text
+    file_hash = hashlib.sha256(csv_text.encode('utf-8')).hexdigest()
+    
+    # 2. Check for duplicate file import
+    if ImportedFile.objects.filter(tenant=tenant, file_hash=file_hash).exists():
+        raise ValueError("File already imported. Skipping to maintain idempotency.")
+        
+    # 3. Read and validate headers
+    f = io.StringIO(csv_text.strip())
+    reader = csv.reader(f)
+    try:
+        headers = next(reader)
+    except StopIteration:
+        raise ValueError("Invalid CSV file format. Required headers: Date, Amount, Reference, FITID are missing.")
+        
+    norm_headers = [h.strip().lower() for h in headers]
+    required = ['date', 'amount', 'reference']
+    for req in required:
+        if req not in norm_headers:
+            raise ValueError("Invalid CSV file format. Required headers: Date, Amount, Reference, FITID are missing.")
+            
+    date_idx = norm_headers.index('date')
+    amount_idx = norm_headers.index('amount')
+    ref_idx = norm_headers.index('reference')
+    fitid_idx = norm_headers.index('fitid') if 'fitid' in norm_headers else -1
+    
+    imported_count = 0
+    skipped_count = 0
+    
+    # 4. Perform imports transactionally
+    with transaction.atomic():
+        imported_file = ImportedFile.objects.create(
+            tenant=tenant,
+            filename=filename,
+            raw_content=csv_text,
+            file_hash=file_hash
+        )
+        
+        for idx, row in enumerate(reader):
+            if not row or not any(row):
+                continue
+                
+            # Validate row length matching headers
+            if len(row) < len(required):
+                continue
+                
+            # Date validation
+            raw_date = row[date_idx].strip()
+            parsed_date = None
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
+                try:
+                    parsed_date = datetime.strptime(raw_date, fmt).date()
+                    break
+                except ValueError:
+                    continue
+            if not parsed_date:
+                raise ValueError(f"Invalid date format in row {idx+1}: {raw_date}")
+                
+            # Amount validation
+            raw_amount = row[amount_idx].strip()
+            try:
+                parsed_amount = Decimal(raw_amount)
+            except Exception:
+                raise ValueError(f"Invalid amount in row {idx+1}: {raw_amount}")
+                
+            # Reference
+            reference = row[ref_idx].strip()
+            
+            # FITID resolution (generate deterministic hash ID if missing)
+            if fitid_idx != -1 and len(row) > fitid_idx and row[fitid_idx].strip():
+                fitid = row[fitid_idx].strip()
+            else:
+                row_hash = hashlib.sha256(f"{parsed_date}-{parsed_amount}-{reference}-{idx}".encode('utf-8')).hexdigest()
+                fitid = f"GEN-{row_hash[:20]}"
+                
+            # Check for duplicate transaction
+            if BankTransaction.objects.filter(tenant=tenant, fitid=fitid).exists():
+                skipped_count += 1
+                continue
+                
+            BankTransaction.objects.create(
+                tenant=tenant,
+                imported_file=imported_file,
+                date=parsed_date,
+                amount=parsed_amount,
+                reference=reference,
+                fitid=fitid
+            )
+            imported_count += 1
+            
+    return imported_count, skipped_count
