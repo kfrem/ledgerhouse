@@ -79,3 +79,31 @@ class AuditEvent(models.Model):
 
     def __str__(self):
         return f"{self.timestamp} - {self.event_type} - {self.username}"
+
+
+class VatRate(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    vat_code = models.CharField(max_length=5)  # SR, RR, ZR, EX, OS
+    rate = models.DecimalField(max_digits=5, decimal_places=4)  # e.g. 0.2000
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('tenant', 'vat_code', 'effective_from')
+
+    def __str__(self):
+        return f"{self.vat_code} ({self.rate * 100}%) from {self.effective_from}"
+
+
+class VatDecisionRule(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    priority = models.IntegerField(default=10)  # lower number = higher priority
+    supplier_name_pattern = models.CharField(max_length=100, blank=True, default='')
+    account_code_pattern = models.CharField(max_length=10, blank=True, default='')
+    vat_code = models.CharField(max_length=5)  # SR, RR, ZR, EX, OS
+    description = models.CharField(max_length=255, blank=True, default='')
+
+    def __str__(self):
+        return f"Rule {self.id}: Supplier '{self.supplier_name_pattern}', Account '{self.account_code_pattern}' -> {self.vat_code}"

@@ -31,3 +31,15 @@ Format:
 - Security/data implications: Enforced strict row-level security isolation at PostgreSQL level. Restored session role context switches to prevent superuser bypass. Implemented database triggers for double-entry balancing and period locks.
 - Known limitations or blockers: None.
 - Exact next task for the next agent: Proceed to Stage 2: VAT decision tables and VAT control account (PLAN.md Section 6.2, Wk 9–11). Implement the configurable VAT decision tables and the VAT control account.
+
+## 2026-07-10 | agent: Gemini | branch: stage-2-vat
+- Task attempted: Stage 2 VAT Decision Tables & VAT Control Account. Configured VatRate and VatDecisionRule models, enabled/forced RLS, granted role permissions, and implemented VAT code resolution algorithm and VAT reports calculation. Wrote unit tests verifying resolution, RLS isolation on rules, and penny-perfect reconciliation.
+- Files touched:
+  - Modify: [STATE.md](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/STATE.md), [BUILDLOG.md](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/BUILDLOG.md), [accounting/models.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/models.py)
+  - Create: [accounting/vat.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/vat.py), [accounting/migrations/0002_vatdecisionrule_vatrate.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/migrations/0002_vatdecisionrule_vatrate.py), [accounting/tests/test_vat.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/tests/test_vat.py)
+- Tests run and result: Run `pytest` locally (17 passed, 4 skipped on SQLite fallback) and `docker compose run --rm web pytest` inside container (21 passed, 100% green). Verification succeeds for VAT rate resolution, RLS isolation on rules, and penny-perfect report reconciliation across all 3 seeded companies.
+- Stage-gate status: Stage 2 complete and verified. All gate checklists met.
+- Commit hash: 6c2691f
+- Security/data implications: Configured RLS on VatRate and VatDecisionRule tables. Restricted permissions to `ledger_tenant_role`.
+- Known limitations or blockers: None.
+- Exact next task for the next agent: Proceed to Stage 3: Controlled CSV bank import (PLAN.md Section 6.2, Wk 12–14). Implement the CSV bank statement import process with structured schema, duplicate prevention by hash, date, amount, reference, and safe error handling.
