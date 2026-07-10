@@ -79,3 +79,15 @@ Format:
 - Security/data implications: Configured RLS on BankReconciliation. Restricted permissions to `ledger_tenant_role`.
 - Known limitations or blockers: None.
 - Exact next task for the next agent: Proceed to Stage 6: Accountant audit interface (PLAN.md Section 6.2, Wk 23–26). Implement read-only trial balance export, VAT return locking, and immutable audit logs.
+
+## 2026-07-10 | agent: Gemini | branch: stage-6-audit
+- Task attempted: Stage 6 Accountant Audit Interface. Created `VatReturn` model, enabled and forced RLS, and granted role permissions. Added `check_vat_return_lock_trigger` trigger to `Journal` to block editing or inserting journals inside a locked VAT Return range. Created trial balance exports, lock period generators, and system-wide accountant audit checks. Wrote unit tests verifying trial balance zero-sum, VAT return lock blocks, RLS isolation on VAT returns, and audit validation logic.
+- Files touched:
+  - Modify: [STATE.md](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/STATE.md), [BUILDLOG.md](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/BUILDLOG.md), [accounting/models.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/models.py)
+  - Create: [accounting/audit.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/audit.py), [accounting/migrations/0006_vatreturn.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/migrations/0006_vatreturn.py), [accounting/tests/test_audit.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/tests/test_audit.py)
+- Tests run and result: Run `pytest` locally (29 passed, 11 skipped on SQLite fallback) and `docker compose run --rm web pytest` inside container (40 passed, 100% green). Verification succeeds for trial balance zero-sum, VAT return locking write-edits blocking, and accountant audit checks.
+- Stage-gate status: Stage 6 complete and verified. All gate checklists met. All milestones of Phase 1 completed successfully.
+- Commit hash: 67e24ae
+- Security/data implications: Configured RLS on VatReturn. Restricted permissions to `ledger_tenant_role`.
+- Known limitations or blockers: None.
+- Exact next task for the next agent: Project is fully completed and tested! Ready for accountant-supervised production staging runs.

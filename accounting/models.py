@@ -179,3 +179,18 @@ class BankReconciliation(models.Model):
 
     def __str__(self):
         return f"Reconciliation {self.id}: BankTx {self.bank_transaction_id} <-> Journal {self.matched_journal_id}"
+
+
+class VatReturn(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    locked_at = models.DateTimeField(auto_now_add=True)
+    locked_by = models.CharField(max_length=100)
+    total_output_vat = models.DecimalField(max_digits=12, decimal_places=2)
+    total_input_vat = models.DecimalField(max_digits=12, decimal_places=2)
+    net_vat_payable = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def __str__(self):
+        return f"VatReturn {self.id} for {self.start_date} to {self.end_date} (Net: {self.net_vat_payable})"
