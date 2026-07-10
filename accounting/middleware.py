@@ -31,7 +31,7 @@ def tenant_context(tenant_id):
     if connection.vendor == 'postgresql':
         with connection.cursor() as cursor:
             try:
-                cursor.execute("SHOW app.current_tenant_id")
+                cursor.execute("SELECT current_setting('app.current_tenant_id', true)")
                 row = cursor.fetchone()
                 if row:
                     old_tenant = row[0]

@@ -167,3 +167,15 @@ class JournalEvidenceLink(models.Model):
 
     def __str__(self):
         return f"Link {self.id}: Journal {self.journal_id} <-> Doc {self.document_id}"
+
+
+class BankReconciliation(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    bank_transaction = models.OneToOneField(BankTransaction, on_delete=models.CASCADE, related_name='reconciliation')
+    matched_journal = models.ForeignKey(Journal, on_delete=models.CASCADE, related_name='reconciliations')
+    reconciled_at = models.DateTimeField(auto_now_add=True)
+    reconciled_by = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"Reconciliation {self.id}: BankTx {self.bank_transaction_id} <-> Journal {self.matched_journal_id}"
