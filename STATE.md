@@ -1,33 +1,36 @@
 # STATE.md — Single source of current truth. Update at the END of every session.
 
 ## Current stage
-Stage 0 — Scope freeze and synthetic company factory (PLAN.md Section 6.2, weeks 1–3)
-Branch: stage-0-foundation
+Stage 1 — Accounting Kernel (PLAN.md Section 6.2, weeks 4–8) - COMPLETE.
+Next Stage: Stage 2 — VAT decision tables and VAT control account (PLAN.md Section 6.2, weeks 9–11)
+Branch: stage-1-kernel
 
 ## Done
-- Initialized Git repository, Docker Compose (Django + PostgreSQL), CI running pytest on push/PR.
-- Documented exclusions list in EXCLUSIONS.md and DECISIONS.md.
-- Built synthetic company factory producing CareCo, ConsultCo, and TradeCo variants deterministically from a fixed seed.
-- Generated and saved expected outcomes as controlled JSON fixtures.
-- Created unit tests verifying double-entry balancing, trial balance zero-sums, VAT reconciliations, aging ledgers, and rejection flows.
+- Set up Docker Compose, Python virtual environment, CI configuration (Stage 0).
+- Created database models: `Tenant`, `NominalAccount`, `AccountingPeriod`, `Journal`, `JournalLine`, `AuditEvent`.
+- Implemented PostgreSQL restricted role `ledger_tenant_role` and enabled/forced Row-Level Security (`FORCE ROW LEVEL SECURITY`) on all multi-tenant tables.
+- Implemented deferred PostgreSQL triggers to enforce journal balancing (Total Debits = Total Credits) upon transaction commit.
+- Implemented BEFORE triggers to enforce period locking (blocks inserts/updates/deletes on journals inside closed periods).
+- Implemented triggers to block update/delete on `AuditEvent` to make audit logs immutable.
+- Built a multi-tenant middleware and connection context managers to set/reset `app.current_tenant_id` and the restricted role session state.
+- Created `test_kernel.py` test suite proving ledger invariants, period locking, audit immutability, and tenant RLS isolation.
+- Loaded CareCo synthetic fixtures, posted to the ledger kernel database, and reconciled expected results to the penny.
 
 ## In progress
-- (none)
+- (none - awaiting gate review and progression approval)
 
 ## Next (in order)
-- progression to Stage 1: Accounting Kernel (Chart, Journals, Periods, Reversals, Tenant Isolation, RLS, Audit, Roles)
+1. progression to Stage 2: VAT decision tables and VAT control account.
 
-## Stage 0 exit gate (do not proceed to Stage 1 until ALL true)
-- [x] Datasets deterministic from seed
-- [x] Expected results stored as fixtures
-- [x] CI green on the fixture suite
-- [x] Exclusions list signed off in DECISIONS.md
+## Stage 1 exit gate (do not proceed to Stage 2 until ALL true)
+- [x] 100% ledger invariants (Total Debits = Total Credits database enforced)
+- [x] Trial balance always balances (zero-sum verified in test suite)
+- [x] Locked periods reject edits (database trigger enforced)
+- [x] Cross-tenant access attempts fail (PostgreSQL RLS enforced and tested)
 
 ## Blockers
 - (none)
 
 ## Notes for the next agent
-- The synthetic company factory is implemented in `accounting/fixtures/factory.py` with seed=42.
-- Fixtures are generated and stored in `accounting/fixtures/generated/` as JSON files.
-- Testing is run via pytest (`.venv\Scripts\pytest` or just `pytest` in Docker/CI). All tests pass.
-
+- Pytest is configured to run migrations by default (removed `--nomigrations` from `pytest.ini`). This is necessary to test RLS policies and database constraints.
+- Tests can be run locally using `pytest` or inside the container using `docker compose run --rm web pytest`. Both environments are 100% green.

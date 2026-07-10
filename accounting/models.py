@@ -1,0 +1,81 @@
+import uuid
+from django.db import models
+
+
+class Tenant(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
+class NominalAccount(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    code = models.CharField(max_length=10)
+    name = models.CharField(max_length=100)
+    category = models.CharField(max_length=50)  # Asset, Liability, Equity, Revenue, Cost of Sales, Expense
+    canonical_taxonomy = models.CharField(max_length=100)
+
+    class Meta:
+        unique_together = ('tenant', 'code')
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
+class AccountingPeriod(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_closed = models.BooleanField(default=False)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    closed_by = models.CharField(max_length=100, null=True, blank=True)
+
+    def __str__(self):
+        status = "Closed" if self.is_closed else "Open"
+        return f"{self.start_date} to {self.end_date} ({status})"
+
+
+class Journal(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    date = models.DateField()
+    description = models.CharField(max_length=255)
+    source_type = models.CharField(max_length=50)  # ManualJournal, SupplierInvoice, SalesInvoice, BankPayment, etc.
+    source_id = models.CharField(max_length=100, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"{self.source_type} {self.id} on {self.date}"
+
+
+class JournalLine(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    journal = models.ForeignKey(Journal, related_name='lines', on_delete=models.CASCADE)
+    account = models.ForeignKey(NominalAccount, on_delete=models.PROTECT)
+    debit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    credit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    vat_code = models.CharField(max_length=5, default='OS')  # SR, RR, ZR, EX, OS
+    vat_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.0000)
+    vat_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    department = models.CharField(max_length=100, null=True, blank=True)
+
+    def __str__(self):
+        return f"Line for Journal {self.journal_id}: {self.account.code} (Dr {self.debit} / Cr {self.credit})"
+
+
+class AuditEvent(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    event_type = models.CharField(max_length=50)
+    username = models.CharField(max_length=100)
+    description = models.TextField()
+    details = models.JSONField(default=dict)
+
+    def __str__(self):
+        return f"{self.timestamp} - {self.event_type} - {self.username}"
