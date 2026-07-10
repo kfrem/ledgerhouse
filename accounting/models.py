@@ -47,6 +47,7 @@ class Journal(models.Model):
     source_id = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.CharField(max_length=100)
+    status = models.CharField(max_length=20, default='Posted')  # Posted, RequiresReview
 
     def __str__(self):
         return f"{self.source_type} {self.id} on {self.date}"
@@ -138,3 +139,31 @@ class BankTransaction(models.Model):
 
     def __str__(self):
         return f"BankTx {self.fitid}: {self.date} {self.amount} {self.reference}"
+
+
+class EvidenceDocument(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    filename = models.CharField(max_length=255)
+    file_content = models.BinaryField()
+    content_type = models.CharField(max_length=100)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    uploaded_by = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"Evidence {self.filename} ({self.content_type})"
+
+
+class JournalEvidenceLink(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    journal = models.ForeignKey(Journal, on_delete=models.CASCADE, related_name='evidence_links')
+    document = models.ForeignKey(EvidenceDocument, on_delete=models.CASCADE)
+    linked_at = models.DateTimeField(auto_now_add=True)
+    linked_by = models.CharField(max_length=100)
+
+    class Meta:
+        unique_together = ('tenant', 'journal', 'document')
+
+    def __str__(self):
+        return f"Link {self.id}: Journal {self.journal_id} <-> Doc {self.document_id}"

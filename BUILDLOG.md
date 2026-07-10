@@ -55,3 +55,15 @@ Format:
 - Security/data implications: Configured RLS on ImportedFile and BankTransaction tables. Restricted permissions to `ledger_tenant_role`.
 - Known limitations or blockers: None.
 - Exact next task for the next agent: Proceed to Stage 4: Purchase ledger and evidence capture (PLAN.md Section 6.2, Wk 15–18). Implement the purchase ledger journal postings, document attachments/evidence linking, correction journal reversals, and tracking of review counts for matching states.
+
+## 2026-07-10 | agent: Gemini | branch: stage-4-evidence
+- Task attempted: Stage 4 Purchase Ledger & Evidence Capture. Configured `Journal.status` field and `EvidenceDocument` & `JournalEvidenceLink` models, enabled/forced RLS, and configured database triggers (`check_journal_status_default` and `update_journal_status_on_link`) to track review flag status. Implemented journal reversals (with closed period date shifting) and review metrics helper. Created unit tests verifying default review states, automatic linking status updates, reversals, and RLS.
+- Files touched:
+  - Modify: [STATE.md](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/STATE.md), [BUILDLOG.md](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/BUILDLOG.md), [accounting/models.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/models.py)
+  - Create: [accounting/reversals.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/reversals.py), [accounting/migrations/0004_journal_status_evidencedocument_journalevidencelink.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/migrations/0004_journal_status_evidencedocument_journalevidencelink.py), [accounting/tests/test_evidence.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/tests/test_evidence.py)
+- Tests run and result: Run `pytest` locally (24 passed, 8 skipped on SQLite fallback) and `docker compose run --rm web pytest` inside container (32 passed, 100% green). Verification succeeds for review status defaults, trigger-based status updates/reversions on link lifecycle, reversal debits/credits swaps, closed period date shifting, and RLS.
+- Stage-gate status: Stage 4 complete and verified. All gate checklists met.
+- Commit hash: 8679827
+- Security/data implications: Configured RLS on EvidenceDocument and JournalEvidenceLink. Restricted permissions to `ledger_tenant_role`.
+- Known limitations or blockers: None.
+- Exact next task for the next agent: Proceed to Stage 5: Bank reconciliation engine (PLAN.md Section 6.2, Wk 19–22). Implement matching bank transactions to ledger entries, clearing accounts, and validation checks.
