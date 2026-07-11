@@ -34,7 +34,8 @@ Branch: stage-6-audit
 - (none - all phases completed)
 
 ## Next (in order)
-- accountant-supervised production staging runs (follow DEPLOYMENT.md; run deploy/create_app_role.sql and switch the web app to the restricted role).
+- Phase 4 (productization & go-live) — scoped in PHASE4_PLAN.md: Stage 7 identity/tenancy, Stage 8 web UI + report pack, Stage 9 real Open Banking (GoCardless), Stage 10 real HMRC MTD VAT, Stage 11 storage/matching hardening, Stage 12 ops & client-zero go-live.
+- Week-0 actions (long lead times): HMRC Developer Hub registration, GoCardless sandbox account, move working copy out of OneDrive, stand up staging VPS.
 
 ## Stage 6 exit gate
 - [x] accountant runs audit check (proven in test suite)
