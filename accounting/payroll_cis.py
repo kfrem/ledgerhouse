@@ -1,8 +1,12 @@
 import csv
 from io import StringIO
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.db import transaction
 from accounting.models import Journal, JournalLine, NominalAccount
+
+# HMRC CIS deduction rates: verified (20%), unverified (30%), gross payment status (0%)
+ALLOWED_CIS_RATES = (Decimal("0.00"), Decimal("0.20"), Decimal("0.30"))
+
 
 def get_or_create_nominal(tenant, code, name, category, canonical_taxonomy):
     nom, _ = NominalAccount.objects.get_or_create(
@@ -35,14 +39,31 @@ def import_payroll_journal(tenant, csv_content, date_val, created_by="System"):
     total_net_wages = Decimal("0.00")
     rows_data = []
 
-    for row in reader:
+    for idx, row in enumerate(reader, start=1):
         dept = row.get("Department", "General")
-        gross = Decimal(row.get("GrossPay", "0.00"))
-        emp_ni = Decimal(row.get("EmployerNI", "0.00"))
-        ee_ni = Decimal(row.get("EmployeeNI", "0.00"))
-        paye = Decimal(row.get("PAYETax", "0.00"))
-        net = Decimal(row.get("NetWages", "0.00"))
-        
+        try:
+            gross = Decimal(row.get("GrossPay", "0.00"))
+            emp_ni = Decimal(row.get("EmployerNI", "0.00"))
+            ee_ni = Decimal(row.get("EmployeeNI", "0.00"))
+            paye = Decimal(row.get("PAYETax", "0.00"))
+            net = Decimal(row.get("NetWages", "0.00"))
+        except InvalidOperation:
+            raise ValueError(f"Payroll CSV row {idx} contains a non-numeric amount.")
+
+        if min(gross, emp_ni, ee_ni, paye, net) < 0:
+            raise ValueError(f"Payroll CSV row {idx} contains a negative amount.")
+
+        # The journal only balances if each row is internally consistent:
+        # GrossPay must fully decompose into PAYE + Employee NI + Net Wages.
+        # Validate here so bad files fail with a clear error instead of a
+        # database constraint violation at commit.
+        deductions_plus_net = paye + ee_ni + net
+        if gross != deductions_plus_net:
+            raise ValueError(
+                f"Payroll CSV row {idx} is inconsistent: GrossPay ({gross}) must equal "
+                f"PAYETax + EmployeeNI + NetWages ({deductions_plus_net})."
+            )
+
         rows_data.append((dept, gross, emp_ni))
         total_paye_nic += (emp_ni + ee_ni + paye)
         total_net_wages += net
@@ -110,12 +131,21 @@ def post_subcontractor_invoice(tenant, subcontractor_name, gross_amount, cis_rat
     Debits: Subcontractor Expense (5100) (Gross Amount)
     Credits: CIS Tax Withholding Liability (2230) + Aged Creditors (2100) (Net Payable)
     """
+    gross = Decimal(str(gross_amount))
+    cis_rate = Decimal(str(cis_rate))
+    if cis_rate not in ALLOWED_CIS_RATES:
+        raise ValueError(
+            f"Invalid CIS rate {cis_rate}. HMRC CIS deduction rates are 0.20 (verified), "
+            f"0.30 (unverified) or 0.00 (gross payment status)."
+        )
+    if gross <= 0:
+        raise ValueError("Subcontractor invoice gross amount must be positive.")
+
     cos_subcon_acc = get_or_create_nominal(tenant, "5100", "Cost of Sales - Direct Materials", "Cost of Sales", "Cost of Sales")
     cis_withholding_acc = get_or_create_nominal(tenant, "2230", "CIS Withholding Liability Account", "Liability", "Tax Liabilities")
     aged_creditors_acc = get_or_create_nominal(tenant, "2100", "Aged Creditors", "Liability", "Trade Payables")
 
-    gross = Decimal(str(gross_amount))
-    cis_amount = gross * Decimal(str(cis_rate))
+    cis_amount = gross * cis_rate
     net_payable = gross - cis_amount
 
     with transaction.atomic():

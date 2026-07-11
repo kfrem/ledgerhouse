@@ -24,12 +24,17 @@ Branch: stage-6-audit
 - Built White-Label Accountant Console (`console.py`) consolidating multi-tenant close, audit, and connection health metrics (Phase 3).
 - Extended the end-to-end test suite (`test_end_to_end.py`) to run and verify all Phase 2 & 3 integrations (Open Banking feeds, MTD filings, Payroll manual journals, CIS subcontractor withholding) across all 6 client profiles.
 - Verified 100% green test suite (47 passed) inside PostgreSQL Docker environment.
+- Stage 6 checker audit completed; all findings remediated and re-verified live (61 tests green):
+  - Migration 0008 hardens the VAT-lock trigger: journal lines inside a filed VAT period can no longer be inserted/updated/deleted, journals cannot be deleted or have their date moved out of a locked range; same OLD-date UPDATE check added to the closed-period trigger.
+  - App-level validations: payroll CSV internal-consistency check (Gross = PAYE + EmployeeNI + Net per row), CIS rate whitelist (0%/20%/30%), Open Banking consent guard (expired/inactive connections refuse to sync and are marked Expired).
+  - PostgreSQL made mandatory: SQLite fallback removed from settings, `conftest.py` aborts the suite on non-Postgres backends, system check `accounting.E001` errors on wrong vendor, `accounting.W001` warns on superuser/BYPASSRLS connections in production.
+  - Deployment readiness: gunicorn + WhiteNoise, hardened `settings.py` (SECRET_KEY required when DEBUG=False, security headers, `SECURE_TLS` toggle), non-root Docker user, `docker-compose.prod.yml`, restricted DB role script (`deploy/create_app_role.sql`), and `DEPLOYMENT.md` runbook. Production boot smoke-tested (collectstatic, deploy checks, gunicorn, static serving all OK under DEBUG=False).
 
 ## In progress
 - (none - all phases completed)
 
 ## Next (in order)
-- accountant-supervised production staging runs.
+- accountant-supervised production staging runs (follow DEPLOYMENT.md; run deploy/create_app_role.sql and switch the web app to the restricted role).
 
 ## Stage 6 exit gate
 - [x] accountant runs audit check (proven in test suite)

@@ -35,6 +35,19 @@ def sync_bank_feed(tenant, connection):
     from accounting.models import ImportedFile
     import hashlib
 
+    if connection.status != 'Connected':
+        raise ValueError(
+            f"Bank feed connection {connection.id} ({connection.bank_name}) is not active "
+            f"(status: {connection.status}). Reauthorization is required before syncing."
+        )
+    if connection.expires_at and connection.expires_at <= timezone.now():
+        connection.status = 'Expired'
+        connection.save(update_fields=['status'])
+        raise ValueError(
+            f"Bank feed consent for connection {connection.id} ({connection.bank_name}) expired "
+            f"on {connection.expires_at:%Y-%m-%d}. Reauthorization is required before syncing."
+        )
+
     client = MockOpenBankingClient()
     since_date = connection.last_sync_at.date() if connection.last_sync_at else date(2026, 1, 1)
     

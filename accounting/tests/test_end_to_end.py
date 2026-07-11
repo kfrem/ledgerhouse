@@ -328,14 +328,17 @@ Operations,4000.00,480.00,400.00,800.00,2800.00
                 assert response_ob["status"] == "success"
                 assert vat_return_ob.status == "Submitted"
 
-                # Clean up to keep the ledger pristine for the subsequent Stage 6 health audit
+                # Clean up to keep the ledger pristine for the subsequent Stage 6 health audit.
+                # The VAT return must be removed FIRST: since migration 0008 the
+                # lock trigger also blocks deleting journals (and editing or
+                # deleting journal lines) inside a filed VAT period.
+                vat_return_ob.delete()
                 j_payroll.delete()
                 j_cis.delete()
                 Journal.objects.filter(tenant=tenant, created_by="Open Banking Autopost").delete()
                 invoice_ob.delete()
                 BankTransaction.objects.filter(tenant=tenant, fitid__startswith="FITID-OB-").delete()
                 connection_ob.delete()
-                vat_return_ob.delete()
 
                 # ==========================================
                 # STAGE 6: Accountant Audit interface

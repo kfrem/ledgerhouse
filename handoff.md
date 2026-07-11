@@ -101,3 +101,17 @@ When reviewing this codebase for production readiness, prioritize the following 
 ### 5. Multi-Currency Operations
 *   **Context**: Supported in metadata, but the core double-entry engine assumes a single functional currency (GBP).
 *   **Opportunity**: Introduce currency exchange rate tracking and automatic unrealized/realized gain/loss postings.
+
+---
+
+## Stage 6 Audit Remediation (2026-07-11)
+
+A full checker audit was run against this codebase and all findings were fixed and re-verified live against PostgreSQL:
+
+*   **VAT lock hardened (migration `0008`)**: the `check_vat_return_lock` trigger previously only covered `INSERT`/`UPDATE` on `accounting_journal`, so journal lines inside a *filed* VAT period could still be edited or deleted, and whole journals deleted. It now covers `INSERT`/`UPDATE`/`DELETE` on both `accounting_journal` and `accounting_journalline`, and on `UPDATE` checks both the OLD and NEW dates (a journal cannot be moved out of a locked range and then edited). The same OLD-date check was added to `check_period_not_closed`.
+*   **Item 1 above is resolved**: PostgreSQL is now mandatory. The SQLite fallback was removed from `settings.py`, `conftest.py` aborts the test run on any non-PostgreSQL backend, and system checks enforce the vendor (`accounting.E001`) and warn on superuser/BYPASSRLS runtime connections (`accounting.W001`).
+*   **Application-level validation added**: payroll CSV rows must satisfy Gross = PAYE + Employee NI + Net (clear `ValueError` instead of a DB constraint blow-up); CIS rates restricted to HMRC's 0% / 20% / 30%; Open Banking sync refuses expired or inactive consents and marks them `Expired`.
+*   **Deployment readiness**: gunicorn + WhiteNoise, non-root Docker image, `docker-compose.prod.yml`, hardened settings (`SECRET_KEY` mandatory when `DEBUG=False`, `SECURE_TLS` toggle for HTTPS hardening), restricted DB role script (`deploy/create_app_role.sql`) so the app can run without RLS-bypassing privileges, and a full runbook in `DEPLOYMENT.md`.
+*   **Test suite grew from 47 to 61 tests** (`test_deployment_hardening.py` covers every remediated finding); 61/61 green.
+
+Items 2–5 above (object storage, bulk performance, split payments, multi-currency) remain the post-deployment roadmap — they are architectural enhancements, not defects, and are also noted in `DEPLOYMENT.md`.

@@ -156,3 +156,6 @@ Thumbs.db
 # Docker
 .docker_volumes/
 docker-compose.override.yml
+
+# Collected static files
+staticfiles/
