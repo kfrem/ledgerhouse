@@ -8,19 +8,19 @@
 #
 # Usage:  bash deploy/hetzner/provision.sh
 #
-# Cost note: CX32 is ~EUR 7.60/month (billed hourly), plus ~20% if
+# Cost note: CX23 is billed hourly, plus ~20% if
 # ENABLE_BACKUPS=1 (default) for Hetzner's 7-day rolling snapshots.
 
 set -euo pipefail
 
 SERVER_NAME="${SERVER_NAME:-ledgerhouse-prod}"
-SERVER_TYPE="${SERVER_TYPE:-cx32}"          # 4 vCPU / 8 GB / 80 GB
+SERVER_TYPE="${SERVER_TYPE:-cx23}"          # 2 vCPU / 4 GB / 40 GB
 IMAGE="${IMAGE:-ubuntu-24.04}"
-LOCATION="${LOCATION:-fsn1}"                # fsn1 Falkenstein | nbg1 Nuremberg | hel1 Helsinki
+LOCATION="${LOCATION:-nbg1}"                # fsn1 Falkenstein | nbg1 Nuremberg | hel1 Helsinki
 SSH_KEY_NAME="${SSH_KEY_NAME:-kfrem-workstation}"
 SSH_PUB_KEY_FILE="${SSH_PUB_KEY_FILE:-$HOME/.ssh/id_ed25519.pub}"
 FIREWALL_NAME="${FIREWALL_NAME:-web-basic}"
-ENABLE_BACKUPS="${ENABLE_BACKUPS:-1}"
+ENABLE_BACKUPS="${ENABLE_BACKUPS:-0}"
 CLOUD_INIT="$(dirname "$0")/cloud-init.yaml"
 
 HCLOUD="${HCLOUD:-hcloud}"

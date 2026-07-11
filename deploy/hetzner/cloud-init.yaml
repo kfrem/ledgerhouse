@@ -1,6 +1,12 @@
 #cloud-config
-# LedgerHouse host bootstrap for Hetzner CX32 (Ubuntu 24.04).
+# LedgerHouse host bootstrap for Hetzner CX23 (Ubuntu 24.04).
 # Applied automatically on first boot by deploy/hetzner/provision.sh.
+
+apt:
+  conf: |
+    Dpkg::Options {
+      "--force-confold";
+    };
 
 package_update: true
 package_upgrade: true
@@ -47,18 +53,19 @@ write_files:
       }
 
 runcmd:
+  - export DEBIAN_FRONTEND=noninteractive
   # --- Docker (official repo) ---
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
   - chmod a+r /etc/apt/keyrings/docker.asc
   - echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list
   - apt-get update
-  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::=--force-confold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   # --- Caddy (official repo) — automatic HTTPS reverse proxy ---
   - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
   - apt-get update
-  - apt-get install -y caddy
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::=--force-confold caddy
   # --- Firewall: SSH, HTTP, HTTPS only ---
   - ufw default deny incoming
   - ufw default allow outgoing
