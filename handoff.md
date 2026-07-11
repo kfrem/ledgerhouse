@@ -34,7 +34,7 @@ The codebase is organized as follows:
     *   [management/commands/seed_db.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/management/commands/seed_db.py): Seeder command populating all 6 tenants and reconciling them.
 *   **Test Suites**:
     *   [tests/test_phase2_3.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/tests/test_phase2_3.py): Phase 2 & 3 sync and statutory tests.
-    *   [tests/test_end_to_end.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/tests/test_end_to_end.py): Unified end-to-end stage verification across all 6 clients.
+    *   [tests/test_end_to_end.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/tests/test_end_to_end.py): Unified end-to-end stage verification across all 6 clients (including Phase 2 & 3 integrations).
 
 ---
 

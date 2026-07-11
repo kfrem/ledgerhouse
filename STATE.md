@@ -22,6 +22,7 @@ Branch: stage-6-audit
 - Built Payroll Journal Importer (`payroll_cis.py`) parsing payroll CSV files to post balanced multi-department staff salary manual journals (Phase 3).
 - Built CIS Subcontractor Withholding helper (`payroll_cis.py`) splitting supplier invoices into tax liabilities and net payables (Phase 3).
 - Built White-Label Accountant Console (`console.py`) consolidating multi-tenant close, audit, and connection health metrics (Phase 3).
+- Extended the end-to-end test suite (`test_end_to_end.py`) to run and verify all Phase 2 & 3 integrations (Open Banking feeds, MTD filings, Payroll manual journals, CIS subcontractor withholding) across all 6 client profiles.
 - Verified 100% green test suite (47 passed) inside PostgreSQL Docker environment.
 
 ## In progress
@@ -35,6 +36,7 @@ Branch: stage-6-audit
 - [x] exports full client trial balance (proven in test suite)
 - [x] end-to-end verification of 6 diverse companies complete
 - [x] Open Banking feeds, MTD filing, Payroll, CIS, and White-label Console complete (Phase 2 & 3)
+- [x] Phase 2 & 3 verified across all 6 clients (proven in test suite)
 
 ## Blockers
 - (none)
