@@ -2,17 +2,22 @@ import json
 import pytest
 import uuid
 from decimal import Decimal
+from datetime import date, timedelta
+from django.utils import timezone
 from pathlib import Path
 from django.db import connection, transaction, utils
 from django.test import TransactionTestCase
 
-from ..models import Tenant, NominalAccount, Journal, JournalLine, BankTransaction, EvidenceDocument, JournalEvidenceLink, VatReturn, ImportedFile
+from ..models import Tenant, NominalAccount, Journal, JournalLine, BankTransaction, EvidenceDocument, JournalEvidenceLink, VatReturn, ImportedFile, BankFeedConnection
 from ..middleware import tenant_context
 from ..vat import calculate_vat_report
 from ..bank_import import import_bank_csv
 from ..reconciliation import reconcile_transaction_to_invoice, verify_ledger_to_bank_balance
 from ..reversals import reverse_journal, get_review_metrics
 from ..audit import generate_trial_balance, lock_vat_period, run_accountant_audit_check
+from ..open_banking import sync_bank_feed
+from ..mtd import submit_vat_return_to_hmrc
+from ..payroll_cis import import_payroll_journal, post_subcontractor_invoice
 
 
 def load_fixture_file(filename: str):
@@ -251,6 +256,90 @@ class EndToEndVerificationTests(TransactionTestCase):
                     acc_bal = next(acc["net"] for acc in tb if acc["code"] == code)
                     assert round(acc_bal, 2) == round(bal, 2), f"Balance mismatch on account {code} for tenant {tenant.name}."
 
+                # ==========================================
+                # PHASE 2 & 3: Open Banking & Statutory Tests
+                # ==========================================
+                # 1. Open Banking Sync
+                connection_ob = BankFeedConnection.objects.create(
+                    tenant=tenant,
+                    bank_name="Mock Barclays",
+                    account_identifier=f"MOCK-BARC-{tenant.id}",
+                    status="Connected",
+                    expires_at=timezone.now() + timedelta(days=90),
+                    consent_token="mock_token"
+                )
+                
+                # Mock a customer invoice for Open Banking matching
+                with transaction.atomic():
+                    invoice_ob = Journal.objects.create(
+                        tenant=tenant,
+                        date=date(2026, 6, 25), # June (matching mock OB feed date 2026-06-25)
+                        description="Open Banking Invoice Match",
+                        source_type="SalesInvoice",
+                        source_id="TC-VI-991",
+                        created_by="Test"
+                    )
+                    debtor_acc = NominalAccount.objects.get(tenant=tenant, code="1100")
+                    sales_acc = NominalAccount.objects.filter(tenant=tenant, code__startswith="4").first()
+                    JournalLine.objects.create(tenant=tenant, journal=invoice_ob, account=debtor_acc, debit=Decimal("1200.00"), credit=Decimal("0.00"))
+                    JournalLine.objects.create(tenant=tenant, journal=invoice_ob, account=sales_acc, debit=Decimal("0.00"), credit=Decimal("1200.00"))
+
+                imported_ob, reconciled_ob = sync_bank_feed(tenant, connection_ob)
+                assert imported_ob == 2
+                assert reconciled_ob == 1
+
+                # 2. Payroll Journal Importer
+                csv_payload = """Department,GrossPay,EmployerNI,EmployeeNI,PAYETax,NetWages
+Operations,4000.00,480.00,400.00,800.00,2800.00
+"""
+                j_payroll = import_payroll_journal(tenant, csv_payload, date(2026, 6, 30), "Payroll System")
+                lines_payroll = JournalLine.objects.filter(journal=j_payroll)
+                payroll_debits = sum(l.debit for l in lines_payroll)
+                payroll_credits = sum(l.credit for l in lines_payroll)
+                assert payroll_debits == payroll_credits
+                assert payroll_debits == Decimal("4480.00")
+
+                # 3. CIS Subcontractor Withholding
+                j_cis = post_subcontractor_invoice(
+                    tenant=tenant,
+                    subcontractor_name="Groundworks Ltd",
+                    gross_amount=Decimal("1000.00"),
+                    cis_rate=Decimal("0.20"),
+                    date_val=date(2026, 6, 20),
+                    department="Development"
+                )
+                lines_cis = JournalLine.objects.filter(journal=j_cis)
+                cis_debits = sum(l.debit for l in lines_cis)
+                cis_credits = sum(l.credit for l in lines_cis)
+                assert cis_debits == cis_credits
+                assert cis_debits == Decimal("1000.00")
+
+                # 4. HMRC MTD VAT Submission (creates VAT return and locks period)
+                vat_return_ob = VatReturn.objects.create(
+                    tenant=tenant,
+                    start_date=date(2026, 6, 1),
+                    end_date=date(2026, 6, 30),
+                    locked_by="Test Auditor",
+                    total_output_vat=Decimal("20.00"),
+                    total_input_vat=Decimal("10.00"),
+                    net_vat_payable=Decimal("10.00")
+                )
+                response_ob = submit_vat_return_to_hmrc(tenant, vat_return_ob, period_key="26A1")
+                assert response_ob["status"] == "success"
+                assert vat_return_ob.status == "Submitted"
+
+                # Clean up to keep the ledger pristine for the subsequent Stage 6 health audit
+                j_payroll.delete()
+                j_cis.delete()
+                Journal.objects.filter(tenant=tenant, created_by="Open Banking Autopost").delete()
+                invoice_ob.delete()
+                BankTransaction.objects.filter(tenant=tenant, fitid__startswith="FITID-OB-").delete()
+                connection_ob.delete()
+                vat_return_ob.delete()
+
+                # ==========================================
+                # STAGE 6: Accountant Audit interface
+                # ==========================================
                 # Lock VAT return period
                 lock_vat_period(tenant, "2026-06-01", "2026-06-30", "Audit Accountant")
 
@@ -267,6 +356,8 @@ class EndToEndVerificationTests(TransactionTestCase):
 
                 # Verify overall accountant health audit passes
                 audit_check = run_accountant_audit_check(tenant)
+                if not audit_check["is_clean"]:
+                    print("\nAUDIT CHECK FAILED DETAILS:", audit_check)
                 assert audit_check["is_clean"] is True
                 assert audit_check["trial_balance_balanced"] is True
                 assert audit_check["requires_review_count"] == 0
