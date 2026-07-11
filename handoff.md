@@ -1,78 +1,54 @@
-# LedgerHouse Phase 1 — Technical Audit & Handoff Document
+# LedgerHouse Phase 1, 2, and 3 — Technical Audit & Handoff Document
 
-This document provides a comprehensive overview of the work completed during Phase 1 of LedgerHouse, detailing the technical architecture, implemented files, testing patterns, and areas for improvement/gaps.
+This document provides a comprehensive technical walkthrough of the entire LedgerHouse codebase, detailing the database triggers, RLS isolation policies, Open Banking sync client, MTD filing module, Payroll and CIS integrations, and areas for verification/improvement.
 
 ---
 
-## 1. Project Overview & Tech Stack
-
-LedgerHouse is a multi-tenant, accountant-supervised finance operations platform designed with high-fidelity control, auditability, and data security at the database layer.
-
+## 1. Tech Stack & Environment
 *   **Framework**: Django 5.2.16 (Python 3.13)
 *   **Database**: PostgreSQL 16
-*   **Isolation**: PostgreSQL Row-Level Security (RLS) policies enforced for `ledger_tenant_role`.
+*   **Security & Isolation**: PostgreSQL Row-Level Security (RLS) policies enforced for `ledger_tenant_role`.
 *   **Integrity Rules**: Enforced via PostgreSQL PL/pgSQL database triggers.
 
 ---
 
-## 2. Directory Layout & Core Components
+## 2. Codebase Layout & Key Files
 
-Here is where the core logic is located:
+The codebase is organized as follows:
 
-```
-├── accounting/
-│   ├── admin.py               # Registers all 14 models in the Django admin panel
-│   ├── audit.py               # Trial Balance reports, period locking, audit checks
-│   ├── bank_import.py         # CSV parser with SHA-256 deduplication and FITID checks
-│   ├── middleware.py          # Tenant context manager setting app.current_tenant_id
-│   ├── models.py              # Schema definition for all accounting structures
-│   ├── reconciliation.py      # Bank clearing matching rules and ledger balance audits
-│   ├── reversals.py           # Period-shifting journal reversal engine
-│   ├── vat.py                 # Priority VAT rate lookup and control reports
-│   ├── fixtures/
-│   │   ├── factory.py         # Original CareCo, ConsultCo, TradeCo synthetic generator
-│   │   ├── new_companies.py   # Seeder script for TechCo, LogisticsCo, CharityCo
-│   │   └── generated/         # JSON fixtures with transactions and expected outcomes
-│   ├── management/commands/
-│   │   └── seed_db.py         # Seeder command populating all 6 tenants and reconciling them
-│   └── tests/
-│       ├── test_kernel.py     # Stage 1: Double-entry and RLS tests
-│       ├── test_vat.py        # Stage 2: VAT lookup and control report tests
-│       ├── test_bank_import.py# Stage 3: CSV import and idempotency tests
-│       ├── test_evidence.py   # Stage 4: Evidence link status promotion tests
-│       ├── test_reconciliation.py # Stage 5: Bank matching clearing tests
-│       ├── test_audit.py      # Stage 6: VAT locking and audit check tests
-│       └── test_end_to_end.py # Unified end-to-end stage verification across all 6 clients
-```
+*   [accounting/admin.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/admin.py): Registers all 15 models (including `BankFeedConnection`) in the Django admin panel.
+*   [accounting/models.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/models.py): Declares schemas, database triggers, and model relations.
+*   [accounting/open_banking.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/open_banking.py): Open Banking sync client with mock aggregator transaction sync.
+*   [accounting/mtd.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/mtd.py): HMRC MTD for VAT submission engine (9-box mapping and mock portal).
+*   [accounting/payroll_cis.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/payroll_cis.py): Parses payroll journals, verifies double-entry balance, and calculates subcontractor CIS tax splits.
+*   [accounting/console.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/console.py): Cross-tenant accountant partner console aggregator.
+*   [accounting/audit.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/audit.py): Trial Balance reports, period locking, audit checks.
+*   [accounting/bank_import.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/bank_import.py): CSV parser with SHA-256 deduplication and FITID checks.
+*   [accounting/middleware.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/middleware.py): Tenant context manager setting `app.current_tenant_id`.
+*   [accounting/reconciliation.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/reconciliation.py): Bank clearing matching rules and ledger balance audits.
+*   [accounting/reversals.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/reversals.py): Period-shifting journal reversal engine.
+*   [accounting/vat.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/vat.py): Priority VAT rate lookup and control reports.
+*   **Fixtures & Seeding**:
+    *   [fixtures/factory.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/fixtures/factory.py): Original CareCo, ConsultCo, TradeCo synthetic generator.
+    *   [fixtures/new_companies.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/fixtures/new_companies.py): Seeder script for TechCo, LogisticsCo, CharityCo.
+    *   [management/commands/seed_db.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/management/commands/seed_db.py): Seeder command populating all 6 tenants and reconciling them.
+*   **Test Suites**:
+    *   [tests/test_phase2_3.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/tests/test_phase2_3.py): Phase 2 & 3 sync and statutory tests.
+    *   [tests/test_end_to_end.py](file:///c:/Users/kfrem/OneDrive/CLIENTS/CLOSE%20COMPANIES/KAFS%20LTD/KAFS%20AUTOMATION/Coaching%20Business/Apps%20Dev/FULL%20ACCOUNTS%20DEPT/accounting/tests/test_end_to_end.py): Unified end-to-end stage verification across all 6 clients.
 
 ---
 
-## 3. Implemented Stages & Core Mechanics
+## 3. Core Accounting Mechanics
 
-### Stage 1: Accounting Kernel (Integrity & Isolation)
-*   **Double-Entry Balancing**: Trigger `check_journal_balance` on the table `accounting_journalline`. Runs `AFTER INSERT OR UPDATE OR DELETE` to ensure total debits equal total credits for each journal.
-*   **Closed Accounting Periods**: Trigger `check_period_not_closed` on `accounting_journal` and `accounting_journalline`. Blocks all mutations (inserts, updates, deletes) where the journal date falls within a closed `AccountingPeriod`.
-*   **Row-Level Security (RLS)**: Policies applied to all transactional tables. In `middleware.py`, the `tenant_context` context manager runs queries inside `ledger_tenant_role` and sets the session variable `app.current_tenant_id`.
+### 1. Integrity & Isolation (PostgreSQL Triggers & RLS)
+*   **Double-Entry Balancing**: Trigger `check_journal_balance` on the table `accounting_journalline`. Ensures total debits equal total credits.
+*   **Closed Accounting Periods**: Trigger `check_period_not_closed` blocks all mutations in closed `AccountingPeriod` intervals.
+*   **Tenant Isolation**: PostgreSQL Row-Level Security policies block cross-tenant database operations based on session parameters (`app.current_tenant_id`).
 
-### Stage 2: VAT Rules & Control Accounts
-*   **Resolution Engine**: Looks up priority rules in `VatDecisionRule` (matching supplier name and nominal account codes). Fallbacks to `VatRate` defaults.
-*   **VAT Control Report**: Aggregates sales/purchase lines to verify that the balance of the VAT Control Account (`2200`) matches computed output VAT minus input VAT to the penny.
-
-### Stage 3: Idempotent Bank CSV Imports
-*   **SHA-256 Deduplication**: Hashes raw CSV contents and stores it in `ImportedFile.file_hash`. Rejects duplicate uploads.
-*   **Line-Level Idempotency**: Skips statement transactions if the transaction `FITID` already exists for that tenant in the database.
-
-### Stage 4: Purchase Ledger & Document Evidence
-*   **Review Status Triggers**: Triggers `check_journal_status_default` (sets status to `RequiresReview` on new invoices/expenses) and `sync_journal_status_on_link` (promotes status to `Posted` when linked to an `EvidenceDocument`, demoting back to `RequiresReview` if the link is deleted).
-*   **Period-Shifting Reversals**: Function `reverse_journal` swaps debits and credits. If the original journal's period is closed, it shifts the transaction date to today's date in the active open period.
-
-### Stage 5: Bank Reconciliation matching
-*   **Dynamic Clearing Rules**: Matches transactions to unpaid invoices. Resolves whether to clear against `2100` (Aged Creditors) or `1100` (Aged Debtors). Creates balanced payments/receipts in the bank account (`1200`).
-*   **Ledger-to-Bank Audit**: Audits the bank account balance against statements, accounting for opening manual journal balances.
-
-### Stage 6: Accountant Audit Interface
-*   **Period Locking**: Finalizing a VAT return creates a `VatReturn` record. Trigger `check_vat_return_lock` blocks future entries in that date range.
-*   **Trial Balance**: Read-only reporting helper returning structured debits/credits.
+### 2. Bank Synchronization & Clearing (Phase 2 & 3)
+*   **Open Banking Engine**: Syncs with bank institutions, logs session references, and runs the matching engine.
+*   **HMRC MTD Filing**: Extracts 9-box VAT values directly from ledger lines and posts to mock HMRC services.
+*   **Payroll & CIS Withholding**: Dynamically imports payroll csv columns and splits subcontractor payments into expense debits, CIS tax liabilities, and Net Aged Creditors.
 
 ---
 
@@ -92,7 +68,7 @@ All database setups are containerized. To run them, execute the following comman
     ```bash
     docker compose run --rm web python manage.py seed_db
     ```
-4.  **Run All Tests (41/41 passing on PostgreSQL)**:
+4.  **Run All Tests (47/47 passing on PostgreSQL)**:
     ```bash
     docker compose run --rm web pytest
     ```
