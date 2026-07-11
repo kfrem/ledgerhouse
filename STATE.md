@@ -1,7 +1,7 @@
 # STATE.md — Single source of current truth. Update at the END of every session.
 
 ## Current stage
-Stage 6 — Accountant audit interface (PLAN.md Section 6.2, weeks 23–26) - COMPLETE.
+Stage 6 — Accountant audit interface & End-to-End Verification - COMPLETE.
 All Stages (0 to 6) — COMPLETE.
 Branch: stage-6-audit
 
@@ -14,8 +14,10 @@ Branch: stage-6-audit
 - Implemented status review triggers for link additions/deletions, real-time review metrics, and closed period date shifting reversals (Stage 4).
 - Implemented bank matching engine generating clearing journals against trade debt/credit accounts and ledger-to-bank balance audits (Stage 5).
 - Implemented trial balance reports, VAT period locking triggers, and accountant system-wide audit checks (Stage 6).
-- Created unit tests verifying default review status, trigger-based status updates/reversions on linking/unlinking, reversal swap calculations, closed period date shifting, bank CSV file parsing, RLS isolation on bank/evidence/reconciliation/VAT tables, clearing journal creation, 100% synthetic statement reconciliation, and VAT period lock write blocking.
-- Verified 100% green test suite (40 passed) inside PostgreSQL Docker environment.
+- Generated three new synthetic client companies (TechCo SaaS, LogisticsCo Haulage, CharityCo Foundation) to test diverse tax codes, outside scope grants, reduced rate fuel costs, and multi-department fund tracking.
+- Created custom `seed_db` command loading all 6 companies and running the reconciliation matches.
+- Built a comprehensive end-to-end test suite (`test_end_to_end.py`) executing all 6 stages of kernel logic sequentially for all 6 clients.
+- Verified 100% green test suite (41 passed) inside PostgreSQL Docker environment.
 
 ## In progress
 - (none - all stages completed)
@@ -26,6 +28,7 @@ Branch: stage-6-audit
 ## Stage 6 exit gate
 - [x] accountant runs audit check (proven in test suite)
 - [x] exports full client trial balance (proven in test suite)
+- [x] end-to-end verification of 6 diverse companies complete
 
 ## Blockers
 - (none)
@@ -33,3 +36,4 @@ Branch: stage-6-audit
 ## Notes for the next agent
 - The platform is fully constructed, tested, and ready for deployment.
 - Strict Row-Level Security, immutable audit logging, balanced journal constraints, and date-locked period edits are fully enforced at the PostgreSQL database engine layer.
+- Seeding and testing verify CareCo, ConsultCo, TradeCo, TechCo, LogisticsCo, and CharityCo.

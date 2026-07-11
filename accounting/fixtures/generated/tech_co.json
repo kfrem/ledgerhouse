@@ -1,0 +1,311 @@
+{
+    "metadata": {
+        "id": "tenant-techco",
+        "name": "TechCo Software Ltd",
+        "vat_registered": true,
+        "departments": [
+            "Engineering",
+            "Sales",
+            "Support"
+        ],
+        "currency": "GBP"
+    },
+    "fixtures": {
+        "transactions": [
+            {
+                "source_id": "TECH-MJ-001",
+                "date": "2026-06-01",
+                "type": "ManualJournal",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 10000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Engineering"
+                    },
+                    {
+                        "account_code": "3200",
+                        "debit": 0.0,
+                        "credit": 10000.0,
+                        "vat_code": "OS",
+                        "department": "Engineering"
+                    }
+                ]
+            },
+            {
+                "source_id": "TECH-SI-101",
+                "date": "2026-06-10",
+                "type": "SalesInvoice",
+                "description": "Monthly SaaS subscription billing",
+                "lines": [
+                    {
+                        "account_code": "1100",
+                        "debit": 1200.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Sales"
+                    },
+                    {
+                        "account_code": "4000",
+                        "debit": 0.0,
+                        "credit": 1000.0,
+                        "vat_code": "SR",
+                        "department": "Sales"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 0.0,
+                        "credit": 200.0,
+                        "vat_code": "SR",
+                        "department": "Sales"
+                    }
+                ]
+            },
+            {
+                "source_id": "TECH-PI-101",
+                "date": "2026-06-12",
+                "type": "SupplierInvoice",
+                "description": "Cloud hosting services",
+                "lines": [
+                    {
+                        "account_code": "6200",
+                        "debit": 500.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Engineering"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 100.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Engineering"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 600.0,
+                        "vat_code": "SR",
+                        "department": "Engineering"
+                    }
+                ]
+            },
+            {
+                "source_id": "TECH-EE-101",
+                "date": "2026-06-15",
+                "type": "EmployeeExpense",
+                "description": "Travel expenses customer visit",
+                "lines": [
+                    {
+                        "account_code": "6310",
+                        "debit": 150.0,
+                        "credit": 0.0,
+                        "vat_code": "EX",
+                        "department": "Support"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 150.0,
+                        "vat_code": "EX",
+                        "department": "Support"
+                    }
+                ]
+            },
+            {
+                "source_id": "TECH-BC-001",
+                "date": "2026-06-30",
+                "type": "BankCharge",
+                "description": "Monthly Account Charge",
+                "lines": [
+                    {
+                        "account_code": "6500",
+                        "debit": 15.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Support"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 15.0,
+                        "vat_code": "OS",
+                        "department": "Support"
+                    }
+                ]
+            }
+        ],
+        "bank_statement": [
+            {
+                "date": "2026-06-12",
+                "amount": 1200.0,
+                "reference": "TECH-SI-101 DEPOSIT",
+                "fitid": "FITID-TECH-001",
+                "matched_to": "TECH-SI-101"
+            },
+            {
+                "date": "2026-06-15",
+                "amount": -600.0,
+                "reference": "HOSTING SERVICES PAY",
+                "fitid": "FITID-TECH-002",
+                "matched_to": "TECH-PI-101"
+            },
+            {
+                "date": "2026-06-30",
+                "amount": -15.0,
+                "reference": "MONTHLY ACCOUNT FEE",
+                "fitid": "FITID-TECH-003",
+                "matched_to": "TECH-BC-001"
+            }
+        ]
+    },
+    "expected_results": {
+        "journal_postings": [
+            {
+                "source_id": "TECH-MJ-001",
+                "date": "2026-06-01",
+                "type": "ManualJournal",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 10000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Engineering"
+                    },
+                    {
+                        "account_code": "3200",
+                        "debit": 0.0,
+                        "credit": 10000.0,
+                        "vat_code": "OS",
+                        "department": "Engineering"
+                    }
+                ]
+            },
+            {
+                "source_id": "TECH-SI-101",
+                "date": "2026-06-10",
+                "type": "SalesInvoice",
+                "description": "Monthly SaaS subscription billing",
+                "lines": [
+                    {
+                        "account_code": "1100",
+                        "debit": 1200.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Sales"
+                    },
+                    {
+                        "account_code": "4000",
+                        "debit": 0.0,
+                        "credit": 1000.0,
+                        "vat_code": "SR",
+                        "department": "Sales"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 0.0,
+                        "credit": 200.0,
+                        "vat_code": "SR",
+                        "department": "Sales"
+                    }
+                ]
+            },
+            {
+                "source_id": "TECH-PI-101",
+                "date": "2026-06-12",
+                "type": "SupplierInvoice",
+                "description": "Cloud hosting services",
+                "lines": [
+                    {
+                        "account_code": "6200",
+                        "debit": 500.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Engineering"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 100.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Engineering"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 600.0,
+                        "vat_code": "SR",
+                        "department": "Engineering"
+                    }
+                ]
+            },
+            {
+                "source_id": "TECH-EE-101",
+                "date": "2026-06-15",
+                "type": "EmployeeExpense",
+                "description": "Travel expenses customer visit",
+                "lines": [
+                    {
+                        "account_code": "6310",
+                        "debit": 150.0,
+                        "credit": 0.0,
+                        "vat_code": "EX",
+                        "department": "Support"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 150.0,
+                        "vat_code": "EX",
+                        "department": "Support"
+                    }
+                ]
+            },
+            {
+                "source_id": "TECH-BC-001",
+                "date": "2026-06-30",
+                "type": "BankCharge",
+                "description": "Monthly Account Charge",
+                "lines": [
+                    {
+                        "account_code": "6500",
+                        "debit": 15.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Support"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 15.0,
+                        "vat_code": "OS",
+                        "department": "Support"
+                    }
+                ]
+            }
+        ],
+        "trial_balance": {
+            "1200": 10585.0,
+            "1100": 0.0,
+            "2100": -150.0,
+            "2200": -100.0,
+            "3200": -10000.0,
+            "4000": -1000.0,
+            "6200": 500.0,
+            "6310": 150.0,
+            "6500": 15.0
+        },
+        "reconciled_bank_balance": 10585.0,
+        "expected_debtors_balance": 0.0,
+        "expected_creditors_balance": 150.0,
+        "vat_summary": {
+            "output_vat": 200.0,
+            "input_vat": 100.0,
+            "net_vat_payable": 100.0
+        }
+    }
+}

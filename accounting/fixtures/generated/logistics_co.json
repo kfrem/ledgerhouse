@@ -1,0 +1,259 @@
+{
+    "metadata": {
+        "id": "tenant-logisticsco",
+        "name": "LogisticsCo Transport Ltd",
+        "vat_registered": true,
+        "departments": [
+            "Domestic",
+            "International",
+            "Fleet Management"
+        ],
+        "currency": "GBP"
+    },
+    "fixtures": {
+        "transactions": [
+            {
+                "source_id": "LOG-MJ-001",
+                "date": "2026-06-01",
+                "type": "ManualJournal",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 25000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Fleet Management"
+                    },
+                    {
+                        "account_code": "3200",
+                        "debit": 0.0,
+                        "credit": 25000.0,
+                        "vat_code": "OS",
+                        "department": "Fleet Management"
+                    }
+                ]
+            },
+            {
+                "source_id": "LOG-SI-101",
+                "date": "2026-06-10",
+                "type": "SalesInvoice",
+                "description": "Domestic cargo delivery",
+                "lines": [
+                    {
+                        "account_code": "1100",
+                        "debit": 6000.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Domestic"
+                    },
+                    {
+                        "account_code": "4000",
+                        "debit": 0.0,
+                        "credit": 5000.0,
+                        "vat_code": "SR",
+                        "department": "Domestic"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 0.0,
+                        "credit": 1000.0,
+                        "vat_code": "SR",
+                        "department": "Domestic"
+                    }
+                ]
+            },
+            {
+                "source_id": "LOG-SI-102",
+                "date": "2026-06-12",
+                "type": "SalesInvoice",
+                "description": "Cross-border cargo delivery",
+                "lines": [
+                    {
+                        "account_code": "1100",
+                        "debit": 8000.0,
+                        "credit": 0.0,
+                        "vat_code": "ZR",
+                        "department": "International"
+                    },
+                    {
+                        "account_code": "4010",
+                        "debit": 0.0,
+                        "credit": 8000.0,
+                        "vat_code": "ZR",
+                        "department": "International"
+                    }
+                ]
+            },
+            {
+                "source_id": "LOG-PI-101",
+                "date": "2026-06-14",
+                "type": "SupplierInvoice",
+                "description": "Bulk diesel purchase",
+                "lines": [
+                    {
+                        "account_code": "5100",
+                        "debit": 4000.0,
+                        "credit": 0.0,
+                        "vat_code": "RR",
+                        "department": "Fleet Management"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 200.0,
+                        "credit": 0.0,
+                        "vat_code": "RR",
+                        "department": "Fleet Management"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 4200.0,
+                        "vat_code": "RR",
+                        "department": "Fleet Management"
+                    }
+                ]
+            }
+        ],
+        "bank_statement": [
+            {
+                "date": "2026-06-15",
+                "amount": 6000.0,
+                "reference": "DOMESTIC DELIV RECEIPT",
+                "fitid": "FITID-LOG-001",
+                "matched_to": "LOG-SI-101"
+            },
+            {
+                "date": "2026-06-18",
+                "amount": -4200.0,
+                "reference": "BULK DIESEL FUEL PMT",
+                "fitid": "FITID-LOG-002",
+                "matched_to": "LOG-PI-101"
+            }
+        ]
+    },
+    "expected_results": {
+        "journal_postings": [
+            {
+                "source_id": "LOG-MJ-001",
+                "date": "2026-06-01",
+                "type": "ManualJournal",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 25000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Fleet Management"
+                    },
+                    {
+                        "account_code": "3200",
+                        "debit": 0.0,
+                        "credit": 25000.0,
+                        "vat_code": "OS",
+                        "department": "Fleet Management"
+                    }
+                ]
+            },
+            {
+                "source_id": "LOG-SI-101",
+                "date": "2026-06-10",
+                "type": "SalesInvoice",
+                "description": "Domestic cargo delivery",
+                "lines": [
+                    {
+                        "account_code": "1100",
+                        "debit": 6000.0,
+                        "credit": 0.0,
+                        "vat_code": "SR",
+                        "department": "Domestic"
+                    },
+                    {
+                        "account_code": "4000",
+                        "debit": 0.0,
+                        "credit": 5000.0,
+                        "vat_code": "SR",
+                        "department": "Domestic"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 0.0,
+                        "credit": 1000.0,
+                        "vat_code": "SR",
+                        "department": "Domestic"
+                    }
+                ]
+            },
+            {
+                "source_id": "LOG-SI-102",
+                "date": "2026-06-12",
+                "type": "SalesInvoice",
+                "description": "Cross-border cargo delivery",
+                "lines": [
+                    {
+                        "account_code": "1100",
+                        "debit": 8000.0,
+                        "credit": 0.0,
+                        "vat_code": "ZR",
+                        "department": "International"
+                    },
+                    {
+                        "account_code": "4010",
+                        "debit": 0.0,
+                        "credit": 8000.0,
+                        "vat_code": "ZR",
+                        "department": "International"
+                    }
+                ]
+            },
+            {
+                "source_id": "LOG-PI-101",
+                "date": "2026-06-14",
+                "type": "SupplierInvoice",
+                "description": "Bulk diesel purchase",
+                "lines": [
+                    {
+                        "account_code": "5100",
+                        "debit": 4000.0,
+                        "credit": 0.0,
+                        "vat_code": "RR",
+                        "department": "Fleet Management"
+                    },
+                    {
+                        "account_code": "2200",
+                        "debit": 200.0,
+                        "credit": 0.0,
+                        "vat_code": "RR",
+                        "department": "Fleet Management"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 4200.0,
+                        "vat_code": "RR",
+                        "department": "Fleet Management"
+                    }
+                ]
+            }
+        ],
+        "trial_balance": {
+            "1200": 26800.0,
+            "1100": 8000.0,
+            "2100": 0.0,
+            "2200": -800.0,
+            "3200": -25000.0,
+            "4000": -5000.0,
+            "4010": -8000.0,
+            "5100": 4000.0
+        },
+        "reconciled_bank_balance": 26800.0,
+        "expected_debtors_balance": 8000.0,
+        "expected_creditors_balance": 0.0,
+        "vat_summary": {
+            "output_vat": 1000.0,
+            "input_vat": 200.0,
+            "net_vat_payable": 800.0
+        }
+    }
+}

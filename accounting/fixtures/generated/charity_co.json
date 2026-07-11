@@ -1,0 +1,186 @@
+{
+    "metadata": {
+        "id": "tenant-charityco",
+        "name": "CharityCo Foundation",
+        "vat_registered": true,
+        "departments": [
+            "Grant Projects",
+            "Community Relief",
+            "Management"
+        ],
+        "currency": "GBP"
+    },
+    "fixtures": {
+        "transactions": [
+            {
+                "source_id": "CHA-MJ-001",
+                "date": "2026-06-01",
+                "type": "ManualJournal",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 5000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Management"
+                    },
+                    {
+                        "account_code": "3200",
+                        "debit": 0.0,
+                        "credit": 5000.0,
+                        "vat_code": "OS",
+                        "department": "Management"
+                    }
+                ]
+            },
+            {
+                "source_id": "CHA-SI-101",
+                "date": "2026-06-05",
+                "type": "SalesInvoice",
+                "description": "Government Project Funding Grant",
+                "lines": [
+                    {
+                        "account_code": "1100",
+                        "debit": 15000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Grant Projects"
+                    },
+                    {
+                        "account_code": "4020",
+                        "debit": 0.0,
+                        "credit": 15000.0,
+                        "vat_code": "OS",
+                        "department": "Grant Projects"
+                    }
+                ]
+            },
+            {
+                "source_id": "CHA-PI-101",
+                "date": "2026-06-08",
+                "type": "SupplierInvoice",
+                "description": "Food supplies for community kitchen",
+                "lines": [
+                    {
+                        "account_code": "6000",
+                        "debit": 2000.0,
+                        "credit": 0.0,
+                        "vat_code": "ZR",
+                        "department": "Community Relief"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 2000.0,
+                        "vat_code": "ZR",
+                        "department": "Community Relief"
+                    }
+                ]
+            }
+        ],
+        "bank_statement": [
+            {
+                "date": "2026-06-10",
+                "amount": 15000.0,
+                "reference": "GOVT GRANT FUNDING",
+                "fitid": "FITID-CHA-001",
+                "matched_to": "CHA-SI-101"
+            },
+            {
+                "date": "2026-06-12",
+                "amount": -2000.0,
+                "reference": "FOOD SUPPLIES CLEAR",
+                "fitid": "FITID-CHA-002",
+                "matched_to": "CHA-PI-101"
+            }
+        ]
+    },
+    "expected_results": {
+        "journal_postings": [
+            {
+                "source_id": "CHA-MJ-001",
+                "date": "2026-06-01",
+                "type": "ManualJournal",
+                "description": "Opening balances post migration",
+                "lines": [
+                    {
+                        "account_code": "1200",
+                        "debit": 5000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Management"
+                    },
+                    {
+                        "account_code": "3200",
+                        "debit": 0.0,
+                        "credit": 5000.0,
+                        "vat_code": "OS",
+                        "department": "Management"
+                    }
+                ]
+            },
+            {
+                "source_id": "CHA-SI-101",
+                "date": "2026-06-05",
+                "type": "SalesInvoice",
+                "description": "Government Project Funding Grant",
+                "lines": [
+                    {
+                        "account_code": "1100",
+                        "debit": 15000.0,
+                        "credit": 0.0,
+                        "vat_code": "OS",
+                        "department": "Grant Projects"
+                    },
+                    {
+                        "account_code": "4020",
+                        "debit": 0.0,
+                        "credit": 15000.0,
+                        "vat_code": "OS",
+                        "department": "Grant Projects"
+                    }
+                ]
+            },
+            {
+                "source_id": "CHA-PI-101",
+                "date": "2026-06-08",
+                "type": "SupplierInvoice",
+                "description": "Food supplies for community kitchen",
+                "lines": [
+                    {
+                        "account_code": "6000",
+                        "debit": 2000.0,
+                        "credit": 0.0,
+                        "vat_code": "ZR",
+                        "department": "Community Relief"
+                    },
+                    {
+                        "account_code": "2100",
+                        "debit": 0.0,
+                        "credit": 2000.0,
+                        "vat_code": "ZR",
+                        "department": "Community Relief"
+                    }
+                ]
+            }
+        ],
+        "trial_balance": {
+            "1200": 18000.0,
+            "1100": 0.0,
+            "2100": 0.0,
+            "2200": 0.0,
+            "3200": -5000.0,
+            "4020": -15000.0,
+            "6000": 2000.0
+        },
+        "reconciled_bank_balance": 18000.0,
+        "expected_debtors_balance": 0.0,
+        "expected_creditors_balance": 0.0,
+        "vat_summary": {
+            "output_vat": 0.0,
+            "input_vat": 0.0,
+            "net_vat_payable": 0.0
+        }
+    }
+}
