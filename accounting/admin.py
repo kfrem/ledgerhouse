@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     Tenant, NominalAccount, AccountingPeriod, Journal, JournalLine,
     AuditEvent, VatRate, VatDecisionRule, ImportedFile, BankTransaction,
-    EvidenceDocument, JournalEvidenceLink, BankReconciliation, VatReturn
+    EvidenceDocument, JournalEvidenceLink, BankReconciliation, VatReturn, BankFeedConnection
 )
 
 @admin.register(Tenant)
@@ -81,5 +81,10 @@ class BankReconciliationAdmin(admin.ModelAdmin):
 
 @admin.register(VatReturn)
 class VatReturnAdmin(admin.ModelAdmin):
-    list_display = ('id', 'tenant', 'start_date', 'end_date', 'total_output_vat', 'total_input_vat', 'net_vat_payable', 'locked_at')
-    list_filter = ('tenant',)
+    list_display = ('id', 'tenant', 'start_date', 'end_date', 'total_output_vat', 'total_input_vat', 'net_vat_payable', 'status', 'hmrc_receipt_id', 'submitted_at', 'locked_at')
+    list_filter = ('tenant', 'status')
+
+@admin.register(BankFeedConnection)
+class BankFeedConnectionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'tenant', 'bank_name', 'account_identifier', 'status', 'connected_at', 'last_sync_at', 'expires_at')
+    list_filter = ('tenant', 'status', 'bank_name')

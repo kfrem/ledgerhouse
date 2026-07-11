@@ -191,6 +191,25 @@ class VatReturn(models.Model):
     total_output_vat = models.DecimalField(max_digits=12, decimal_places=2)
     total_input_vat = models.DecimalField(max_digits=12, decimal_places=2)
     net_vat_payable = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=20, default='Draft')  # Draft, Submitted
+    hmrc_receipt_id = models.CharField(max_length=100, null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    period_key = models.CharField(max_length=10, null=True, blank=True)
 
     def __str__(self):
-        return f"VatReturn {self.id} for {self.start_date} to {self.end_date} (Net: {self.net_vat_payable})"
+        return f"VatReturn {self.id} for {self.start_date} to {self.end_date} (Net: {self.net_vat_payable}, Status: {self.status})"
+
+
+class BankFeedConnection(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    bank_name = models.CharField(max_length=100)
+    account_identifier = models.CharField(max_length=100)  # Account number/IBAN
+    status = models.CharField(max_length=20, default='Connected')  # Connected, Expired
+    connected_at = models.DateTimeField(auto_now_add=True)
+    last_sync_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    consent_token = models.TextField()
+
+    def __str__(self):
+        return f"{self.bank_name} - {self.account_identifier} ({self.status}) for Tenant {self.tenant_id}"
