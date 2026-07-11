@@ -9,7 +9,35 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
+    # PostgreSQL is mandatory: the double-entry balance constraint, closed-period
+    # and VAT-lock triggers, audit immutability and tenant RLS are all enforced
+    # at the database layer, and conftest.py aborts the suite on other backends.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ledgerhouse_ci
+          POSTGRES_USER: ledgerhouse_ci
+          POSTGRES_PASSWORD: ledgerhouse_ci_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ledgerhouse_ci -d ledgerhouse_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DEBUG: 'False'
+      SECRET_KEY: ci-only-secret-key-never-used-outside-ci
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      POSTGRES_DB: ledgerhouse_ci
+      POSTGRES_USER: ledgerhouse_ci
+      POSTGRES_PASSWORD: ledgerhouse_ci_pass
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '5432'
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
@@ -25,10 +53,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Generate Synthetic Fixtures
-      run: |
-        python accounting/fixtures/generator.py
+    # Synthetic fixtures are committed (accounting/fixtures/generated/) and were
+    # produced with a fixed seed; they are deliberately NOT regenerated in CI so
+    # a faker version bump cannot silently diverge from expected_results.json.
 
-    - name: Run Pytest Fixture Verification
-      run: |
-        pytest
+    - name: Verify migrations are complete
+      run: python manage.py makemigrations --check --dry-run
+
+    - name: Django system checks (backend gate + deploy checks)
+      run: python manage.py check --database default
+
+    - name: Run Test Suite (PostgreSQL triggers, RLS, integrations)
+      run: pytest
