@@ -1,0 +1,78 @@
+#cloud-config
+# LedgerHouse host bootstrap for Hetzner CX32 (Ubuntu 24.04).
+# Applied automatically on first boot by deploy/hetzner/provision.sh.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - debian-keyring
+  - debian-archive-keyring
+  - apt-transport-https
+
+swap:
+  filename: /swapfile
+  size: 2G
+  maxsize: 2G
+
+write_files:
+  # Weekly security patching without manual attention
+  - path: /etc/apt/apt.conf.d/51-auto-upgrades-custom
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "04:30";
+  # Central reverse proxy config: one site block per hosted app.
+  # Replace the example domains once DNS is pointed at this server.
+  - path: /etc/caddy/Caddyfile
+    content: |
+      # ledger.example.co.uk {
+      #     reverse_proxy 127.0.0.1:8000
+      # }
+      # app2.example.co.uk {
+      #     reverse_proxy 127.0.0.1:8001
+      # }
+      # app3.example.co.uk {
+      #     reverse_proxy 127.0.0.1:8002
+      # }
+      :80 {
+          respond "LedgerHouse host is up. Configure /etc/caddy/Caddyfile." 200
+      }
+
+runcmd:
+  # --- Docker (official repo) ---
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  # --- Caddy (official repo) — automatic HTTPS reverse proxy ---
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
+  - apt-get update
+  - apt-get install -y caddy
+  # --- Firewall: SSH, HTTP, HTTPS only ---
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow OpenSSH
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw --force enable
+  # --- SSH hardening: keys only ---
+  - sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+  - sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+  - systemctl restart ssh
+  # --- App directories: one per hosted application ---
+  - mkdir -p /srv/ledgerhouse /srv/app2 /srv/app3 /srv/backups
+  - systemctl enable --now fail2ban
+  - systemctl restart caddy
+
+final_message: "LedgerHouse host bootstrap complete after $UPTIME seconds."
