@@ -35,6 +35,12 @@ services:
       - POSTGRES_PASSWORD=ledgerhouse_secure_pass_123
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
+      - HMRC_ENVIRONMENT=${HMRC_ENVIRONMENT:-sandbox}
+      - HMRC_CLIENT_ID=${HMRC_CLIENT_ID:-}
+      - HMRC_CLIENT_SECRET=${HMRC_CLIENT_SECRET:-}
+      - HMRC_REDIRECT_URI=${HMRC_REDIRECT_URI:-http://localhost:8000/api/integrations/hmrc/callback}
+      - HMRC_SCOPES=${HMRC_SCOPES:-read:vat write:vat}
+      - HMRC_API_BASE_URL=${HMRC_API_BASE_URL:-https://test-api.service.hmrc.gov.uk}
     depends_on:
       db:
         condition: service_healthy
