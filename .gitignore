@@ -162,3 +162,4 @@ staticfiles/
 
 # Local database/server backups
 backups/
+local_demo_files/

@@ -1,9 +1,12 @@
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.http import Http404, HttpResponse
 from django.db.models import Count, Max, Q, Sum
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
+from .intake import process_uploaded_file
 from .models import (
     BankReconciliation,
     BankTransaction,
@@ -13,6 +16,7 @@ from .models import (
     Tenant,
     VatReturn,
 )
+from .reports import management_report_csv, management_report_pdf
 
 
 def _money(value):
@@ -20,11 +24,10 @@ def _money(value):
     return f"GBP {value:,.2f}"
 
 
-@login_required(login_url="/login/")
-def client_portal(request):
+def _selected_tenant(request):
     tenants = list(Tenant.objects.order_by("name"))
     selected_tenant = None
-    requested_tenant = request.GET.get("company")
+    requested_tenant = request.GET.get("company") or request.POST.get("company")
 
     if requested_tenant:
         selected_tenant = next(
@@ -33,6 +36,32 @@ def client_portal(request):
         )
     if selected_tenant is None and tenants:
         selected_tenant = tenants[0]
+    return tenants, selected_tenant
+
+
+@login_required(login_url="/login/")
+def client_portal(request):
+    tenants, selected_tenant = _selected_tenant(request)
+
+    if request.method == "POST":
+        if not selected_tenant:
+            messages.error(request, "No company is available for uploads.")
+            return redirect("client_portal")
+        uploaded_files = request.FILES.getlist("documents")
+        if not uploaded_files:
+            messages.error(request, "Choose at least one file to upload.")
+        else:
+            for uploaded_file in uploaded_files:
+                try:
+                    result = process_uploaded_file(
+                        selected_tenant,
+                        uploaded_file,
+                        request.user.get_username() or "client",
+                    )
+                    messages.success(request, f"{uploaded_file.name}: {result.message}")
+                except Exception as exc:
+                    messages.error(request, f"{uploaded_file.name}: {exc}")
+        return redirect(f"{request.path}?company={selected_tenant.id}#upload")
 
     revenue = Decimal("0")
     expenses = Decimal("0")
@@ -95,6 +124,24 @@ def client_portal(request):
         "vat_returns": vat_returns,
     }
     return render(request, "accounting/client_portal.html", context)
+
+
+@login_required(login_url="/login/")
+def download_management_report(request, tenant_id, file_format):
+    try:
+        tenant = Tenant.objects.get(id=tenant_id)
+    except Tenant.DoesNotExist as exc:
+        raise Http404("Company not found") from exc
+
+    if file_format == "csv":
+        response = HttpResponse(management_report_csv(tenant), content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{tenant.name}-management-report.csv"'
+        return response
+    if file_format == "pdf":
+        response = HttpResponse(management_report_pdf(tenant), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{tenant.name}-management-report.pdf"'
+        return response
+    raise Http404("Report format not supported")
 
 
 @login_required(login_url="/login/")

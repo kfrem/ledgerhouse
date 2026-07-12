@@ -866,6 +866,33 @@ input {
     margin-top: 14px;
 }
 
+.file-input {
+    width: min(520px, 100%);
+    padding: 13px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.message-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.message {
+    padding: 11px 12px;
+    border-radius: 8px;
+    background: #eef6f3;
+    color: var(--green-dark);
+    font-weight: 800;
+}
+
+.message.error {
+    background: #fff1ef;
+    color: var(--red);
+}
+
 .upload-types span {
     padding: 8px 10px;
     border-radius: 999px;
@@ -987,6 +1014,21 @@ input {
     color: var(--green-dark);
     font-style: normal;
     font-weight: 850;
+}
+
+.report-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.report-actions a {
+    min-width: 48px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: #eef6f3;
+    color: var(--green-dark);
+    font-weight: 900;
+    text-align: center;
 }
 
 .activity-item {

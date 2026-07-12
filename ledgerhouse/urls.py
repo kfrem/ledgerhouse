@@ -1,11 +1,16 @@
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path
-from accounting.views import client_portal, practice_dashboard
+from accounting.views import client_portal, download_management_report, practice_dashboard
 
 urlpatterns = [
     path('', client_portal, name='client_portal'),
     path('practice/', practice_dashboard, name='practice_dashboard'),
+    path(
+        'reports/<uuid:tenant_id>/<str:file_format>/',
+        download_management_report,
+        name='download_management_report',
+    ),
     path(
         'login/',
         auth_views.LoginView.as_view(

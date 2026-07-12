@@ -97,13 +97,23 @@
                         <p class="eyebrow">Send us your paperwork</p>
                         <h2>Upload anything finance-related</h2>
                     </div>
-                    <span class="status-pill">Design preview</span>
+                    <span class="status-pill">Local intake active</span>
                 </div>
-                <div class="dropzone">
+                {% if messages %}
+                <div class="message-list">
+                    {% for message in messages %}
+                    <div class="message {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <form class="dropzone" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="company" value="{{ selected_tenant.id }}">
                     <strong>Drop receipts, invoices, photos, PDFs or spreadsheets here</strong>
-                    <span>Or choose files from your computer. The next build will connect this to secure file intake.</span>
-                    <button class="solid-button" type="button">Choose files</button>
-                </div>
+                    <span>CSV and XLSX bank files are imported into banking. PDFs, photos and other files are stored in the evidence vault.</span>
+                    <input class="file-input" type="file" name="documents" multiple>
+                    <button class="solid-button" type="submit">Upload selected files</button>
+                </form>
                 <div class="upload-types">
                     <span>Invoices</span>
                     <span>Expense photos</span>
@@ -196,9 +206,16 @@
                     <div class="report-item">
                         <span>
                             <strong>Profit and loss pack</strong>
-                            <small>Designed for owner-manager review.</small>
+                            <small>Download a local management pack generated from current records.</small>
                         </span>
+                        {% if selected_tenant %}
+                        <span class="report-actions">
+                            <a href="{% url 'download_management_report' selected_tenant.id 'csv' %}">CSV</a>
+                            <a href="{% url 'download_management_report' selected_tenant.id 'pdf' %}">PDF</a>
+                        </span>
+                        {% else %}
                         <em>Draft</em>
+                        {% endif %}
                     </div>
                 </div>
             </article>
