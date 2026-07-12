@@ -7,6 +7,12 @@ from django.db.models import Count, Max, Q, Sum
 from django.shortcuts import redirect, render
 
 from .intake import process_uploaded_file
+from .mtd import (
+    build_hmrc_authorisation_url,
+    exchange_hmrc_authorisation_code,
+    hmrc_sandbox_status,
+    unpack_hmrc_state,
+)
 from .models import (
     BankReconciliation,
     BankTransaction,
@@ -196,5 +202,57 @@ def practice_dashboard(request):
         "upload_inbox": upload_inbox,
         "unmatched_bank_transactions": unmatched_bank_transactions,
         "review_journals": review_journals,
+        "hmrc_status": hmrc_sandbox_status(),
     }
     return render(request, "accounting/dashboard.html", context)
+
+
+@login_required(login_url="/login/")
+def hmrc_sandbox_status_view(request):
+    return render(
+        request,
+        "accounting/hmrc_status.html",
+        {"hmrc_status": hmrc_sandbox_status()},
+    )
+
+
+@login_required(login_url="/login/")
+def hmrc_authorise(request):
+    try:
+        authorisation_url = build_hmrc_authorisation_url(
+            request.GET.get("next") or "/practice/"
+        )
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect("hmrc_sandbox_status")
+    return redirect(authorisation_url)
+
+
+@login_required(login_url="/login/")
+def hmrc_callback(request):
+    error = request.GET.get("error")
+    if error:
+        messages.error(request, f"HMRC authorisation failed: {error}")
+        return redirect("hmrc_sandbox_status")
+
+    code = request.GET.get("code")
+    state = request.GET.get("state")
+    if not code or not state:
+        messages.error(request, "HMRC callback did not include the expected code and state.")
+        return redirect("hmrc_sandbox_status")
+
+    try:
+        unpacked_state = unpack_hmrc_state(state)
+        token_payload = exchange_hmrc_authorisation_code(code)
+    except Exception as exc:
+        messages.error(request, f"HMRC token exchange failed: {exc}")
+        return redirect("hmrc_sandbox_status")
+
+    request.session["hmrc_sandbox_token"] = {
+        "access_token": token_payload.get("access_token"),
+        "refresh_token": token_payload.get("refresh_token"),
+        "scope": token_payload.get("scope"),
+        "expires_in": token_payload.get("expires_in"),
+    }
+    messages.success(request, "HMRC VAT sandbox authorisation completed.")
+    return redirect(unpacked_state.get("next") or "hmrc_sandbox_status")

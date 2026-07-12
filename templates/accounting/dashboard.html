@@ -183,6 +183,35 @@
                         <li>Management report pack</li>
                     </ul>
                 </article>
+
+                <article class="surface integration-card">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">HMRC sandbox</p>
+                            <h2>VAT MTD connection</h2>
+                        </div>
+                        {% if hmrc_status.configured %}
+                        <span class="status-pill">Ready</span>
+                        {% else %}
+                        <span class="status-pill warning">Needs secret</span>
+                        {% endif %}
+                    </div>
+                    <div class="config-list compact">
+                        <div class="config-item">
+                            <span>VAT MTD</span>
+                            <strong>Subscribed</strong>
+                        </div>
+                        <div class="config-item">
+                            <span>Fraud headers</span>
+                            <strong>Subscribed</strong>
+                        </div>
+                        <div class="config-item">
+                            <span>Redirect</span>
+                            <strong>localhost:8000</strong>
+                        </div>
+                    </div>
+                    <a class="text-link" href="{% url 'hmrc_sandbox_status' %}">Open HMRC status</a>
+                </article>
             </aside>
 
             <article class="surface workbench-surface">

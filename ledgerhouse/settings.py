@@ -163,3 +163,26 @@ if not DEBUG:
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# HMRC Developer Hub / VAT MTD sandbox integration. Client secrets must only be
+# supplied through the local environment or .env file; never commit them.
+HMRC_ENVIRONMENT = os.environ.get('HMRC_ENVIRONMENT', 'sandbox')
+HMRC_CLIENT_ID = os.environ.get('HMRC_CLIENT_ID', '')
+HMRC_CLIENT_SECRET = os.environ.get('HMRC_CLIENT_SECRET', '')
+HMRC_REDIRECT_URI = os.environ.get(
+    'HMRC_REDIRECT_URI',
+    'http://localhost:8000/api/integrations/hmrc/callback',
+)
+HMRC_SCOPES = os.environ.get('HMRC_SCOPES', 'read:vat write:vat')
+HMRC_API_BASE_URL = os.environ.get(
+    'HMRC_API_BASE_URL',
+    'https://test-api.service.hmrc.gov.uk',
+)
+HMRC_AUTHORIZE_URL = os.environ.get(
+    'HMRC_AUTHORIZE_URL',
+    f'{HMRC_API_BASE_URL}/oauth/authorize',
+)
+HMRC_TOKEN_URL = os.environ.get(
+    'HMRC_TOKEN_URL',
+    f'{HMRC_API_BASE_URL}/oauth/token',
+)

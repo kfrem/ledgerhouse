@@ -1,0 +1,122 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | HMRC sandbox</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Finaccord Pro</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
+            <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a class="active" href="{% url 'hmrc_sandbox_status' %}"><span>03</span> HMRC sandbox</a>
+            <a href="/admin/accounting/vatreturn/"><span>04</span> VAT</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Sandbox</p>
+            <strong>VAT MTD</strong>
+            <small>Local OAuth callback and HMRC sandbox diagnostics.</small>
+        </section>
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Government integrations</p>
+                <h1>HMRC VAT sandbox</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'practice_dashboard' %}">Practice dashboard</a>
+                <form action="{% url 'logout' %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="solid-button">Sign out</button>
+                </form>
+            </div>
+        </header>
+
+        <section class="surface integration-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Connection status</p>
+                    <h2>KAFS UK Accounting SaaS</h2>
+                </div>
+                {% if hmrc_status.configured %}
+                <span class="status-pill">Ready for OAuth</span>
+                {% else %}
+                <span class="status-pill warning">Needs secret</span>
+                {% endif %}
+            </div>
+
+            {% if messages %}
+            <div class="message-list">
+                {% for message in messages %}
+                <div class="message {{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="integration-grid">
+                <div>
+                    <span>Environment</span>
+                    <strong>{{ hmrc_status.environment|title }}</strong>
+                </div>
+                <div>
+                    <span>Sandbox base URL</span>
+                    <strong>{{ hmrc_status.api_base_url }}</strong>
+                </div>
+                <div>
+                    <span>Redirect URI</span>
+                    <strong>{{ hmrc_status.redirect_uri }}</strong>
+                </div>
+            </div>
+
+            <div class="config-list">
+                <div class="config-item">
+                    <span>Client ID</span>
+                    <strong>{% if hmrc_status.required.client_id %}Configured{% else %}Missing{% endif %}</strong>
+                </div>
+                <div class="config-item">
+                    <span>Client secret</span>
+                    <strong>{% if hmrc_status.required.client_secret %}Configured{% else %}Missing{% endif %}</strong>
+                </div>
+                <div class="config-item">
+                    <span>VAT scopes</span>
+                    <strong>{% if hmrc_status.required.vat_scopes %}Configured{% else %}Missing{% endif %}</strong>
+                </div>
+            </div>
+
+            <div class="report-list">
+                {% for api in hmrc_status.subscribed_apis %}
+                <div class="report-item">
+                    <span>
+                        <strong>{{ api }}</strong>
+                        <small>Subscribed in the HMRC sandbox application.</small>
+                    </span>
+                    <em>Added</em>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="hero-actions integration-actions">
+                {% if hmrc_status.configured %}
+                <a class="solid-button" href="{% url 'hmrc_authorise' %}">Authorise VAT sandbox</a>
+                {% else %}
+                <button class="solid-button" type="button" disabled>Authorise VAT sandbox</button>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+</body>
+</html>

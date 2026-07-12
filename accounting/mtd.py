@@ -1,9 +1,100 @@
 import uuid
+import json
+import urllib.parse
+import urllib.request
 from datetime import datetime
 from decimal import Decimal
+from django.conf import settings
+from django.core import signing
 from django.utils import timezone
 from django.db import transaction
 from accounting.models import VatReturn, JournalLine
+
+
+VAT_MTD_SCOPE = "read:vat write:vat"
+
+
+def hmrc_sandbox_status():
+    """Return non-secret HMRC sandbox readiness details for the practice UI."""
+    required = {
+        "client_id": bool(settings.HMRC_CLIENT_ID),
+        "client_secret": bool(settings.HMRC_CLIENT_SECRET),
+        "redirect_uri": bool(settings.HMRC_REDIRECT_URI),
+        "vat_scopes": "read:vat" in settings.HMRC_SCOPES and "write:vat" in settings.HMRC_SCOPES,
+    }
+    return {
+        "environment": settings.HMRC_ENVIRONMENT,
+        "api_base_url": settings.HMRC_API_BASE_URL,
+        "redirect_uri": settings.HMRC_REDIRECT_URI,
+        "configured": all(required.values()),
+        "required": required,
+        "subscribed_apis": ["VAT (MTD) 1.0", "Test Fraud Prevention Headers 1.0"],
+    }
+
+
+def build_hmrc_authorisation_url(next_url="/practice/"):
+    """Build the OAuth URL for HMRC VAT MTD user authorisation."""
+    if not settings.HMRC_CLIENT_ID:
+        raise ValueError("HMRC_CLIENT_ID is not configured.")
+    state = signing.dumps({"next": next_url, "ts": timezone.now().isoformat()}, salt="hmrc-oauth")
+    params = {
+        "response_type": "code",
+        "client_id": settings.HMRC_CLIENT_ID,
+        "scope": settings.HMRC_SCOPES or VAT_MTD_SCOPE,
+        "redirect_uri": settings.HMRC_REDIRECT_URI,
+        "state": state,
+    }
+    return f"{settings.HMRC_AUTHORIZE_URL}?{urllib.parse.urlencode(params)}"
+
+
+def unpack_hmrc_state(state):
+    return signing.loads(state, salt="hmrc-oauth", max_age=3600)
+
+
+def exchange_hmrc_authorisation_code(code):
+    """Exchange an HMRC OAuth authorisation code for tokens."""
+    if not settings.HMRC_CLIENT_ID:
+        raise ValueError("HMRC_CLIENT_ID is not configured.")
+    if not settings.HMRC_CLIENT_SECRET:
+        raise ValueError("HMRC_CLIENT_SECRET is not configured.")
+
+    body = urllib.parse.urlencode(
+        {
+            "grant_type": "authorization_code",
+            "client_id": settings.HMRC_CLIENT_ID,
+            "client_secret": settings.HMRC_CLIENT_SECRET,
+            "redirect_uri": settings.HMRC_REDIRECT_URI,
+            "code": code,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        settings.HMRC_TOKEN_URL,
+        data=body,
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def build_desktop_fraud_prevention_headers(device_id, public_ip="127.0.0.1"):
+    """
+    Build baseline fraud prevention headers for local sandbox requests.
+
+    These values are only suitable for development diagnostics; production
+    header collection must reflect the real customer device and connection.
+    """
+    return {
+        "Gov-Client-Connection-Method": "DESKTOP_APP_DIRECT",
+        "Gov-Client-Device-ID": device_id,
+        "Gov-Client-Public-IP": public_ip,
+        "Gov-Client-Timezone": "+00:00",
+        "Gov-Client-User-Agent": "LedgerHouse/local-sandbox",
+        "Gov-Vendor-Version": "LedgerHouse=local",
+    }
 
 class MockHMRCClient:
     """Mock client simulating HMRC's MTD for VAT submission endpoint."""

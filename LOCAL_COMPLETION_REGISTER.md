@@ -83,6 +83,15 @@ This register separates what has been completed and verified locally from what c
   - VAT report logic is tested.
   - Evidence: `accounting/reports.py`, `accounting/tests/test_client_portal_workflows.py`, full pytest suite.
 
+- [x] HMRC VAT MTD sandbox application prepared.
+  - Main HMRC sandbox app: `KAFS UK Accounting SaaS`.
+  - Subscribed APIs: `VAT (MTD) 1.0` and `Test Fraud Prevention Headers 1.0`.
+  - Redirect URI added in HMRC: `http://localhost:8000/api/integrations/hmrc/callback`.
+  - Local status page exists at `/integrations/hmrc/`.
+  - Local OAuth start route exists at `/api/integrations/hmrc/authorise/`.
+  - Local OAuth callback route exists at `/api/integrations/hmrc/callback`.
+  - Evidence: `accounting/tests/test_hmrc_sandbox.py`.
+
 - [x] CSV/XLSX/PDF processing.
   - CSV bank statement import tested.
   - XLSX bank statement import tested through `openpyxl`.
@@ -101,7 +110,8 @@ This register separates what has been completed and verified locally from what c
 
 - [x] Most automated tests.
   - Focused client/practice workflow tests: `8 passed`.
-  - Full suite: `69 passed`.
+  - Focused HMRC sandbox tests: `6 passed`.
+  - Full suite: `75 passed`.
   - Only warning observed: Django local staticfiles directory warning during tests; it does not fail the suite.
 
 ## Verified Commands From This Pass
@@ -112,6 +122,7 @@ This register separates what has been completed and verified locally from what c
 - [x] `docker compose exec -T web python manage.py seed_db`
 - [x] `docker compose exec -T web python manage.py build_demo_files`
 - [x] `docker compose exec -T web pytest accounting/tests/test_client_portal_workflows.py -q`
+- [x] `docker compose exec -T web pytest accounting/tests/test_hmrc_sandbox.py -q`
 - [x] `docker compose exec -T web pytest -q`
 - [x] `docker compose build web`
 
@@ -138,8 +149,12 @@ This register separates what has been completed and verified locally from what c
   - Local substitute completed: mock Open Banking connection and sync logic are tested.
 
 - [ ] Real HMRC MTD VAT filing.
-  - Constraint: requires HMRC developer/app credentials, callback URL, organisation authorisation, and sandbox/live filing setup.
-  - Local substitute completed: mock HMRC VAT payload/filing flow is tested.
+  - Constraint: requires the HMRC sandbox client secret to be saved locally in `.env`, then an OAuth authorisation journey against a sandbox VAT test user. Production filing still requires production credentials and approval.
+  - Local substitute completed: HMRC sandbox app is subscribed to VAT MTD and Test Fraud Prevention Headers, local OAuth/callback routes exist, and the callback URI is registered in HMRC.
+
+- [ ] HMRC production credentials.
+  - Constraint: requires completing sandbox testing, customer data/terms/privacy information, fraud prevention header checks, and HMRC production credential approval.
+  - Local substitute completed: sandbox-only integration scaffolding is ready.
 
 - [ ] Payment provider callbacks.
   - Constraint: requires a chosen payment provider, account credentials, public webhook URL, and signed webhook testing.
