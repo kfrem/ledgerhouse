@@ -159,3 +159,6 @@ docker-compose.override.yml
 
 # Collected static files
 staticfiles/
+
+# Local database/server backups
+backups/
