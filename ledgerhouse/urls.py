@@ -1,8 +1,8 @@
 from django.contrib import admin
-from django.shortcuts import redirect
 from django.urls import path
+from accounting.views import dashboard
 
 urlpatterns = [
-    path('', lambda request: redirect('admin:index', permanent=False)),
+    path('', dashboard, name='dashboard'),
     path('admin/', admin.site.urls),
 ]

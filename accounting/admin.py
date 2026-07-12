@@ -5,6 +5,10 @@ from .models import (
     EvidenceDocument, JournalEvidenceLink, BankReconciliation, VatReturn, BankFeedConnection
 )
 
+admin.site.site_header = "LedgerHouse Operations"
+admin.site.site_title = "LedgerHouse"
+admin.site.index_title = "Accounting control room"
+
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'created_at')
