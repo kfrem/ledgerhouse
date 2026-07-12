@@ -20,7 +20,7 @@ def _money(value):
     return f"GBP {value:,.2f}"
 
 
-@login_required(login_url="/admin/login/")
+@login_required(login_url="/login/")
 def dashboard(request):
     tenants = list(
         Tenant.objects.annotate(
@@ -49,6 +49,7 @@ def dashboard(request):
         "tenants": tenants,
         "tenant_count": len(tenants),
         "journal_count": Journal.objects.count(),
+        "bank_count": BankTransaction.objects.count(),
         "evidence_count": EvidenceDocument.objects.count(),
         "unreconciled_count": unreconciled_count,
         "revenue": _money(revenue),

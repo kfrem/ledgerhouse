@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LedgerHouse</title>
+    <title>LedgerHouse | Portfolio</title>
     <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
 </head>
 <body>
@@ -13,70 +13,125 @@
             <span class="brand-mark">LH</span>
             <span>
                 <strong>LedgerHouse</strong>
-                <small>Finaccord workspace</small>
+                <small>Finaccord Pro</small>
             </span>
         </a>
+
         <nav class="nav-list">
-            <a class="active" href="{% url 'dashboard' %}">Overview</a>
-            <a href="/admin/accounting/tenant/">Clients</a>
-            <a href="/admin/accounting/journal/">Journals</a>
-            <a href="/admin/accounting/banktransaction/">Banking</a>
-            <a href="/admin/accounting/vatreturn/">VAT returns</a>
-            <a href="/admin/accounting/evidencedocument/">Evidence</a>
+            <a class="active" href="{% url 'dashboard' %}"><span>01</span> Overview</a>
+            <a href="/admin/accounting/tenant/"><span>02</span> Clients</a>
+            <a href="/admin/accounting/journal/"><span>03</span> Ledger</a>
+            <a href="/admin/accounting/banktransaction/"><span>04</span> Banking</a>
+            <a href="/admin/accounting/vatreturn/"><span>05</span> VAT</a>
+            <a href="/admin/accounting/evidencedocument/"><span>06</span> Evidence</a>
         </nav>
-        <div class="sidebar-panel">
-            <span class="panel-label">Environment</span>
-            <strong>Production</strong>
-            <small>HTTPS, Postgres, restricted app role</small>
-        </div>
+
+        <section class="sidebar-panel">
+            <p>Production</p>
+            <strong>Secure workspace</strong>
+            <small>HTTPS live, PostgreSQL active, restricted runtime role.</small>
+        </section>
     </aside>
 
     <main class="workspace">
         <header class="topbar">
             <div>
-                <p class="eyebrow">Accounting command centre</p>
-                <h1>Client portfolio</h1>
+                <p class="eyebrow">Accounting operations suite</p>
+                <h1>Portfolio command centre</h1>
             </div>
             <div class="topbar-actions">
-                <a class="ghost-button" href="/admin/">Admin</a>
-                <form action="/admin/logout/" method="post">
+                <a class="ghost-button" href="/admin/">Data room</a>
+                <form action="{% url 'logout' %}" method="post">
                     {% csrf_token %}
-                    <button type="submit" class="icon-button" title="Sign out" aria-label="Sign out">Q</button>
+                    <button type="submit" class="solid-button">Sign out</button>
                 </form>
             </div>
         </header>
 
+        <section class="hero-panel">
+            <div class="hero-copy">
+                <p class="eyebrow">Today</p>
+                <h2>{{ tenant_count }} clients under control</h2>
+                <p class="hero-text">Live ledger totals, compliance signals, bank matching and evidence readiness in one controlled finance workspace.</p>
+                <div class="hero-actions">
+                    <a class="solid-button" href="/admin/accounting/journal/">Review ledger</a>
+                    <a class="ghost-button dark" href="/admin/accounting/banktransaction/">Open banking</a>
+                </div>
+            </div>
+            <div class="finance-visual" aria-label="Portfolio health visual">
+                <div class="visual-card top">
+                    <span>Net position</span>
+                    <strong>{{ margin }}</strong>
+                </div>
+                <div class="bar-chart" aria-hidden="true">
+                    <span style="height: 54%"></span>
+                    <span style="height: 72%"></span>
+                    <span style="height: 46%"></span>
+                    <span style="height: 88%"></span>
+                    <span style="height: 64%"></span>
+                    <span style="height: 78%"></span>
+                </div>
+                <div class="visual-card bottom">
+                    <span>VAT payable</span>
+                    <strong>{{ vat_due }}</strong>
+                </div>
+            </div>
+        </section>
+
         <section class="summary-grid" aria-label="Portfolio metrics">
-            <article class="metric primary">
-                <span>Net position</span>
-                <strong>{{ margin }}</strong>
-                <small>Revenue less operating costs</small>
-            </article>
             <article class="metric">
                 <span>Revenue</span>
                 <strong>{{ revenue }}</strong>
                 <small>{{ journal_count }} posted journals</small>
             </article>
             <article class="metric">
-                <span>VAT payable</span>
-                <strong>{{ vat_due }}</strong>
-                <small>Across filed return records</small>
+                <span>Operating costs</span>
+                <strong>{{ expenses }}</strong>
+                <small>Expense and cost-of-sales lines</small>
             </article>
-            <article class="metric warning">
-                <span>Unmatched bank lines</span>
-                <strong>{{ unreconciled_count }}</strong>
-                <small>Reconciliation queue</small>
+            <article class="metric">
+                <span>Bank lines</span>
+                <strong>{{ bank_count }}</strong>
+                <small>{{ unreconciled_count }} awaiting match</small>
+            </article>
+            <article class="metric">
+                <span>Evidence vault</span>
+                <strong>{{ evidence_count }}</strong>
+                <small>Documents linked to journals</small>
             </article>
         </section>
 
+        <section class="module-grid" aria-label="Product modules">
+            <a class="module-tile ready" href="/admin/accounting/tenant/">
+                <span>Clients</span>
+                <strong>Portfolio records</strong>
+                <small>Manage entities, accounts and source activity.</small>
+            </a>
+            <a class="module-tile ready" href="/admin/accounting/journal/">
+                <span>Ledger</span>
+                <strong>Double-entry core</strong>
+                <small>Review postings, source types and audit trail.</small>
+            </a>
+            <a class="module-tile" href="/admin/accounting/banktransaction/">
+                <span>Banking</span>
+                <strong>Matching queue</strong>
+                <small>Bank lines and reconciliation status.</small>
+            </a>
+            <a class="module-tile" href="/admin/accounting/vatreturn/">
+                <span>Tax</span>
+                <strong>VAT control</strong>
+                <small>Returns, locks, receipts and submissions.</small>
+            </a>
+        </section>
+
         <section class="content-grid">
-            <article class="surface wide">
+            <article class="surface client-surface">
                 <div class="section-heading">
                     <div>
                         <p class="eyebrow">Portfolio</p>
-                        <h2>{{ tenant_count }} active clients</h2>
+                        <h2>Client book</h2>
                     </div>
-                    <a class="text-link" href="/admin/accounting/tenant/">Manage</a>
+                    <a class="text-link" href="/admin/accounting/tenant/">Manage clients</a>
                 </div>
                 <div class="client-list">
                     {% for tenant in tenants %}
@@ -84,7 +139,7 @@
                         <span class="client-avatar">{{ tenant.name|slice:":2" }}</span>
                         <span class="client-main">
                             <strong>{{ tenant.name }}</strong>
-                            <small>{{ tenant.journals_count }} journals · {{ tenant.bank_count }} bank lines · {{ tenant.evidence_count }} documents</small>
+                            <small>{{ tenant.journals_count }} journals | {{ tenant.bank_count }} bank lines | {{ tenant.evidence_count }} documents</small>
                         </span>
                         <span class="status-pill">Active</span>
                     </a>
@@ -94,36 +149,49 @@
                 </div>
             </article>
 
-            <article class="surface">
-                <div class="section-heading">
-                    <div>
-                        <p class="eyebrow">Compliance</p>
-                        <h2>VAT returns</h2>
+            <aside class="right-rail">
+                <article class="surface compliance-card">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">Compliance</p>
+                            <h2>VAT returns</h2>
+                        </div>
+                        <a class="text-link" href="/admin/accounting/vatreturn/">Open</a>
                     </div>
-                    <a class="text-link" href="/admin/accounting/vatreturn/">Open</a>
-                </div>
-                <div class="stack-list">
-                    {% for vat_return in vat_returns %}
-                    <a class="stack-item" href="/admin/accounting/vatreturn/{{ vat_return.id }}/change/">
-                        <span>
-                            <strong>{{ vat_return.tenant.name }}</strong>
-                            <small>{{ vat_return.start_date }} to {{ vat_return.end_date }}</small>
-                        </span>
-                        <span class="amount">GBP {{ vat_return.net_vat_payable }}</span>
-                    </a>
-                    {% empty %}
-                    <div class="empty-state">No VAT returns yet.</div>
-                    {% endfor %}
-                </div>
-            </article>
+                    <div class="stack-list">
+                        {% for vat_return in vat_returns %}
+                        <a class="stack-item" href="/admin/accounting/vatreturn/{{ vat_return.id }}/change/">
+                            <span>
+                                <strong>{{ vat_return.tenant.name }}</strong>
+                                <small>{{ vat_return.start_date }} to {{ vat_return.end_date }}</small>
+                            </span>
+                            <span class="amount">GBP {{ vat_return.net_vat_payable }}</span>
+                        </a>
+                        {% empty %}
+                        <div class="empty-state">No VAT returns yet.</div>
+                        {% endfor %}
+                    </div>
+                </article>
 
-            <article class="surface wide">
+                <article class="surface roadmap-card">
+                    <p class="eyebrow">Next build</p>
+                    <h2>Product workflows</h2>
+                    <ul>
+                        <li>Client onboarding screens</li>
+                        <li>Invoice and receipt capture</li>
+                        <li>Bank feed matching review</li>
+                        <li>Management report pack</li>
+                    </ul>
+                </article>
+            </aside>
+
+            <article class="surface activity-surface">
                 <div class="section-heading">
                     <div>
                         <p class="eyebrow">Latest ledger activity</p>
                         <h2>Posting stream</h2>
                     </div>
-                    <a class="text-link" href="/admin/accounting/journal/">Review</a>
+                    <a class="text-link" href="/admin/accounting/journal/">Review all</a>
                 </div>
                 <div class="activity-table">
                     <div class="table-head">
@@ -143,13 +211,6 @@
                     <div class="empty-state">No journals have been posted yet.</div>
                     {% endfor %}
                 </div>
-            </article>
-
-            <article class="surface insight">
-                <p class="eyebrow">Evidence vault</p>
-                <strong>{{ evidence_count }}</strong>
-                <span>documents linked to journals</span>
-                <a class="solid-button" href="/admin/accounting/evidencedocument/">Open vault</a>
             </article>
         </section>
     </main>
