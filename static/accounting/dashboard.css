@@ -573,6 +573,138 @@ input {
     margin-top: 18px;
 }
 
+.page-messages {
+    margin-bottom: 18px;
+}
+
+.vat-control-panel {
+    margin-bottom: 18px;
+}
+
+.inline-switcher {
+    max-width: 420px;
+    margin-top: 18px;
+    color: var(--ink);
+    background: #f8fbfa;
+    border-color: var(--line);
+}
+
+.inline-switcher label,
+.inline-switcher small {
+    color: var(--muted);
+}
+
+.vat-workspace-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.vat-card {
+    display: grid;
+    gap: 11px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid #e3eeea;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.vat-card span,
+.vat-card label,
+.vat-obligation-card small {
+    color: var(--muted);
+    font-weight: 800;
+}
+
+.vat-card input,
+.date-pair input {
+    min-height: 42px;
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 11px;
+    background: #fbfdfc;
+}
+
+.date-pair {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+}
+
+.vat-obligation-list {
+    display: grid;
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.vat-obligation-card {
+    padding: 16px;
+    border: 1px solid #e3eeea;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.vat-obligation-card header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.vat-obligation-card h3 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.vat-box-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.vat-box-grid div {
+    min-height: 112px;
+    padding: 12px;
+    border: 1px solid #e8efed;
+    border-radius: 8px;
+    background: #f8fbfa;
+}
+
+.vat-box-grid span,
+.vat-box-grid strong,
+.vat-box-grid small {
+    display: block;
+}
+
+.vat-box-grid span {
+    color: var(--green);
+    font-size: 0.75rem;
+    font-weight: 900;
+}
+
+.vat-box-grid strong {
+    margin: 14px 0 6px;
+    font-size: 1.25rem;
+}
+
+.vat-submit-row {
+    margin-top: 14px;
+}
+
+.response-block {
+    overflow: auto;
+    padding: 14px;
+    border: 1px solid #e3eeea;
+    border-radius: 8px;
+    background: #0e2025;
+    color: #eef8f5;
+}
+
 .solid-button:disabled {
     cursor: not-allowed;
     opacity: 0.58;
@@ -1250,7 +1382,9 @@ input {
     .client-hero,
     .client-grid,
     .integration-grid,
-    .workbench-grid {
+    .workbench-grid,
+    .vat-workspace-grid,
+    .vat-box-grid {
         grid-template-columns: 1fr;
     }
 }

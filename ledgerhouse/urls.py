@@ -7,6 +7,7 @@ from accounting.views import (
     hmrc_authorise,
     hmrc_callback,
     hmrc_sandbox_status_view,
+    hmrc_vat_workspace,
     practice_dashboard,
 )
 
@@ -22,6 +23,11 @@ urlpatterns = [
         'integrations/hmrc/',
         hmrc_sandbox_status_view,
         name='hmrc_sandbox_status',
+    ),
+    path(
+        'integrations/hmrc/vat/',
+        hmrc_vat_workspace,
+        name='hmrc_vat_workspace',
     ),
     path(
         'api/integrations/hmrc/authorise/',

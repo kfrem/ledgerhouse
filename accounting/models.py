@@ -200,6 +200,27 @@ class VatReturn(models.Model):
         return f"VatReturn {self.id} for {self.start_date} to {self.end_date} (Net: {self.net_vat_payable}, Status: {self.status})"
 
 
+class HmrcVatConnection(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name='hmrc_vat_connection')
+    vrn = models.CharField(max_length=9, blank=True, default='')
+    status = models.CharField(max_length=20, default='NotConnected')
+    access_token = models.TextField(blank=True, default='')
+    refresh_token = models.TextField(blank=True, default='')
+    scope = models.CharField(max_length=120, blank=True, default='')
+    token_expires_at = models.DateTimeField(null=True, blank=True)
+    last_authorised_at = models.DateTimeField(null=True, blank=True)
+    last_obligations_sync_at = models.DateTimeField(null=True, blank=True)
+    latest_obligations = models.JSONField(default=list, blank=True)
+    last_submission_response = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        label = self.vrn or "No VRN"
+        return f"HMRC VAT {label} ({self.status}) for Tenant {self.tenant_id}"
+
+
 class BankFeedConnection(models.Model):
     id = models.BigAutoField(primary_key=True)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)

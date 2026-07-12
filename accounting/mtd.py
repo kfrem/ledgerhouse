@@ -173,6 +173,23 @@ def submit_vat_return_payload(access_token, vrn, payload, device_id, public_ip="
     )
     return response["payload"]
 
+
+def to_hmrc_vat_return_payload(serialized_return):
+    """Map LedgerHouse 9-box names to HMRC VAT MTD API field names."""
+    return {
+        "periodKey": serialized_return["periodKey"],
+        "vatDueSales": serialized_return["vatDueOnOutputs"],
+        "vatDueAcquisitions": serialized_return["vatDueAcquisitions"],
+        "totalVatDue": serialized_return["totalVatDue"],
+        "vatReclaimedCurrPeriod": serialized_return["vatReclaimedCurrPeriod"],
+        "netVatDue": serialized_return["netVatDue"],
+        "totalValueSalesExVAT": serialized_return["totalValueSalesExVAT"],
+        "totalValuePurchasesExVAT": serialized_return["totalValuePurchasesExVAT"],
+        "totalValueGoodsSuppliedExVAT": serialized_return["totalValueGoodsSuppliedExVAT"],
+        "totalAcquisitionsExVAT": serialized_return["totalValueGoodsAcquisitionsExVAT"],
+        "finalised": serialized_return["finalised"],
+    }
+
 class MockHMRCClient:
     """Mock client simulating HMRC's MTD for VAT submission endpoint."""
     @staticmethod

@@ -1,22 +1,32 @@
+from datetime import date, timedelta
 from decimal import Decimal
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import Http404, HttpResponse
 from django.db.models import Count, Max, Q, Sum
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from .intake import process_uploaded_file
 from .mtd import (
+    HmrcApiError,
     build_hmrc_authorisation_url,
     exchange_hmrc_authorisation_code,
     hmrc_sandbox_status,
+    retrieve_vat_obligations,
+    retrieve_vat_return,
+    serialize_vat_return_9_box,
+    submit_vat_return_payload,
+    to_hmrc_vat_return_payload,
     unpack_hmrc_state,
 )
 from .models import (
     BankReconciliation,
     BankTransaction,
     EvidenceDocument,
+    HmrcVatConnection,
     Journal,
     JournalLine,
     Tenant,
@@ -209,10 +219,145 @@ def practice_dashboard(request):
 
 @login_required(login_url="/login/")
 def hmrc_sandbox_status_view(request):
+    tenants, selected_tenant = _selected_tenant(request)
     return render(
         request,
         "accounting/hmrc_status.html",
-        {"hmrc_status": hmrc_sandbox_status()},
+        {
+            "hmrc_status": hmrc_sandbox_status(),
+            "tenants": tenants,
+            "selected_tenant": selected_tenant,
+        },
+    )
+
+
+@login_required(login_url="/login/")
+def hmrc_vat_workspace(request):
+    tenants, selected_tenant = _selected_tenant(request)
+    connection = None
+    obligations = []
+    prepared_returns = {}
+
+    if selected_tenant:
+        connection, _ = HmrcVatConnection.objects.get_or_create(tenant=selected_tenant)
+
+    if request.method == "POST" and selected_tenant and connection:
+        action = request.POST.get("action")
+        if action == "save_vrn":
+            vrn = (request.POST.get("vrn") or "").strip().replace(" ", "")
+            if not (vrn.isdigit() and len(vrn) == 9):
+                messages.error(request, "Enter a valid 9 digit VAT registration number.")
+            else:
+                connection.vrn = vrn
+                connection.save(update_fields=["vrn", "updated_at"])
+                messages.success(request, "HMRC VAT registration number saved for this client.")
+            return redirect(f"{request.path}?company={selected_tenant.id}")
+
+        if action == "sync_obligations":
+            if not connection.access_token or not connection.vrn:
+                messages.error(request, "Authorise HMRC and save a VRN before syncing obligations.")
+            else:
+                try:
+                    obligations = retrieve_vat_obligations(
+                        connection.access_token,
+                        connection.vrn,
+                        request.POST.get("from_date") or "2026-01-01",
+                        request.POST.get("to_date") or "2026-12-31",
+                        f"ledgerhouse-{selected_tenant.id}",
+                    )
+                    connection.latest_obligations = obligations
+                    connection.last_obligations_sync_at = timezone.now()
+                    connection.save(update_fields=["latest_obligations", "last_obligations_sync_at", "updated_at"])
+                    messages.success(request, f"Synced {len(obligations)} HMRC VAT obligation(s).")
+                except HmrcApiError as exc:
+                    messages.error(request, f"HMRC obligations sync failed: {exc}")
+            return redirect(f"{request.path}?company={selected_tenant.id}")
+
+        if action == "submit_return":
+            period_key = request.POST.get("period_key")
+            matching_obligation = next(
+                (item for item in connection.latest_obligations if item.get("periodKey") == period_key),
+                None,
+            )
+            if not connection.access_token or not connection.vrn:
+                messages.error(request, "Authorise HMRC and save a VRN before submitting.")
+            elif not matching_obligation:
+                messages.error(request, "Sync HMRC obligations before submitting this period.")
+            elif matching_obligation.get("status") != "O":
+                messages.error(request, "Only open HMRC VAT periods can be submitted.")
+            else:
+                payload = serialize_vat_return_9_box(
+                    selected_tenant,
+                    matching_obligation["start"],
+                    matching_obligation["end"],
+                )
+                payload["periodKey"] = period_key
+                hmrc_payload = to_hmrc_vat_return_payload(payload)
+                try:
+                    response_payload = submit_vat_return_payload(
+                        connection.access_token,
+                        connection.vrn,
+                        hmrc_payload,
+                        f"ledgerhouse-{selected_tenant.id}",
+                    )
+                    connection.last_submission_response = response_payload
+                    connection.save(update_fields=["last_submission_response", "updated_at"])
+                    VatReturn.objects.update_or_create(
+                        tenant=selected_tenant,
+                        period_key=period_key,
+                        defaults={
+                            "start_date": date.fromisoformat(matching_obligation["start"]),
+                            "end_date": date.fromisoformat(matching_obligation["end"]),
+                            "locked_by": request.user.get_username() or "system",
+                            "total_output_vat": Decimal(str(hmrc_payload["vatDueSales"])),
+                            "total_input_vat": Decimal(str(payload["vatReclaimedCurrPeriod"])),
+                            "net_vat_payable": Decimal(str(payload["netVatDue"])),
+                            "status": "Submitted",
+                            "hmrc_receipt_id": response_payload.get("formBundleNumber"),
+                            "submitted_at": timezone.now(),
+                        },
+                    )
+                    messages.success(request, f"Submitted VAT period {period_key} to HMRC sandbox.")
+                except HmrcApiError as exc:
+                    try:
+                        existing_return = retrieve_vat_return(
+                            connection.access_token,
+                            connection.vrn,
+                            period_key,
+                            f"ledgerhouse-{selected_tenant.id}",
+                        )
+                        messages.error(
+                            request,
+                            f"HMRC rejected the submission, but an existing return for {period_key} was retrieved.",
+                        )
+                        connection.last_submission_response = {"existing_return": existing_return}
+                        connection.save(update_fields=["last_submission_response", "updated_at"])
+                    except HmrcApiError:
+                        messages.error(request, f"HMRC VAT submission failed: {exc}")
+            return redirect(f"{request.path}?company={selected_tenant.id}")
+
+    if connection:
+        obligations = connection.latest_obligations or []
+        for obligation in obligations:
+            prepared = serialize_vat_return_9_box(
+                selected_tenant,
+                obligation["start"],
+                obligation["end"],
+            )
+            prepared["periodKey"] = obligation["periodKey"]
+            prepared_returns[obligation["periodKey"]] = prepared
+
+    return render(
+        request,
+        "accounting/hmrc_vat_workspace.html",
+        {
+            "hmrc_status": hmrc_sandbox_status(),
+            "tenants": tenants,
+            "selected_tenant": selected_tenant,
+            "connection": connection,
+            "obligations": obligations,
+            "prepared_returns": prepared_returns,
+        },
     )
 
 
@@ -254,5 +399,22 @@ def hmrc_callback(request):
         "scope": token_payload.get("scope"),
         "expires_in": token_payload.get("expires_in"),
     }
+
+    next_url = unpacked_state.get("next") or ""
+    tenant_id = (parse_qs(urlparse(next_url).query).get("company") or [None])[0]
+    if tenant_id:
+        try:
+            tenant = Tenant.objects.get(id=tenant_id)
+            connection, _ = HmrcVatConnection.objects.get_or_create(tenant=tenant)
+            expires_in = token_payload.get("expires_in") or 0
+            connection.access_token = token_payload.get("access_token") or ""
+            connection.refresh_token = token_payload.get("refresh_token") or ""
+            connection.scope = token_payload.get("scope") or ""
+            connection.token_expires_at = timezone.now() + timedelta(seconds=int(expires_in))
+            connection.last_authorised_at = timezone.now()
+            connection.status = "Connected"
+            connection.save()
+        except (Tenant.DoesNotExist, ValueError):
+            messages.warning(request, "HMRC authorised, but the selected client could not be linked.")
     messages.success(request, "HMRC VAT sandbox authorisation completed.")
     return redirect(unpacked_state.get("next") or "hmrc_sandbox_status")

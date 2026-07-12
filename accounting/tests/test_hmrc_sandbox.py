@@ -15,7 +15,9 @@ from accounting.mtd import (
     retrieve_vat_obligations,
     retrieve_vat_return,
     submit_vat_return_payload,
+    to_hmrc_vat_return_payload,
 )
+from accounting.models import HmrcVatConnection, Tenant, VatReturn
 
 
 class HmrcSandboxIntegrationTests(TestCase):
@@ -115,6 +117,27 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertEqual(headers["Gov-Client-Public-IP"], "203.0.113.10")
         self.assertIn("Gov-Vendor-Version", headers)
 
+    def test_vat_payload_mapper_uses_hmrc_field_names(self):
+        payload = to_hmrc_vat_return_payload(
+            {
+                "periodKey": "18A2",
+                "vatDueOnOutputs": 105.5,
+                "vatDueAcquisitions": 0,
+                "totalVatDue": 105.5,
+                "vatReclaimedCurrPeriod": 25.25,
+                "netVatDue": 80.25,
+                "totalValueSalesExVAT": 1000,
+                "totalValuePurchasesExVAT": 250,
+                "totalValueGoodsSuppliedExVAT": 0,
+                "totalValueGoodsAcquisitionsExVAT": 0,
+                "finalised": True,
+            }
+        )
+
+        self.assertEqual(payload["vatDueSales"], 105.5)
+        self.assertEqual(payload["totalAcquisitionsExVAT"], 0)
+        self.assertNotIn("vatDueOnOutputs", payload)
+
     @override_settings(HMRC_API_BASE_URL="https://test-api.service.hmrc.gov.uk")
     @patch("accounting.mtd.urllib.request.urlopen")
     def test_retrieve_vat_obligations_calls_hmrc_with_fraud_headers(self, urlopen):
@@ -201,3 +224,124 @@ class HmrcSandboxIntegrationTests(TestCase):
 
         self.assertEqual(raised.exception.status_code, 400)
         self.assertEqual(raised.exception.payload["code"], "INVALID_DATE_RANGE")
+
+    def test_vat_workspace_renders_selected_tenant_connection(self):
+        tenant = Tenant.objects.create(name="Sandbox Client Ltd")
+        HmrcVatConnection.objects.create(
+            tenant=tenant,
+            vrn="123456789",
+            status="Connected",
+            access_token="access-token",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("hmrc_vat_workspace"), {"company": tenant.id})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sandbox Client Ltd")
+        self.assertContains(response, "Token stored")
+        self.assertContains(response, "123456789")
+
+    @override_settings(
+        HMRC_CLIENT_ID="sandbox-client-id",
+        HMRC_CLIENT_SECRET="sandbox-secret",
+        HMRC_SCOPES="read:vat write:vat",
+        HMRC_REDIRECT_URI="http://localhost:8000/api/integrations/hmrc/callback",
+    )
+    def test_callback_persists_token_to_selected_tenant_connection(self):
+        tenant = Tenant.objects.create(name="OAuth Client Ltd")
+        self.client.force_login(self.user)
+        authorisation_url = build_hmrc_authorisation_url(
+            f"/integrations/hmrc/vat/?company={tenant.id}"
+        )
+        state = parse_qs(urlparse(authorisation_url).query)["state"][0]
+
+        with patch(
+            "accounting.views.exchange_hmrc_authorisation_code",
+            return_value={
+                "access_token": "access-token",
+                "refresh_token": "refresh-token",
+                "scope": "read:vat write:vat",
+                "expires_in": 14400,
+            },
+        ):
+            response = self.client.get(
+                reverse("hmrc_callback"),
+                {"code": "auth-code", "state": state},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], f"/integrations/hmrc/vat/?company={tenant.id}")
+        connection = HmrcVatConnection.objects.get(tenant=tenant)
+        self.assertEqual(connection.status, "Connected")
+        self.assertEqual(connection.scope, "read:vat write:vat")
+        self.assertTrue(connection.access_token)
+
+    @patch("accounting.views.retrieve_vat_obligations")
+    def test_vat_workspace_syncs_obligations(self, retrieve_obligations):
+        tenant = Tenant.objects.create(name="Obligation Client Ltd")
+        HmrcVatConnection.objects.create(
+            tenant=tenant,
+            vrn="123456789",
+            status="Connected",
+            access_token="access-token",
+        )
+        retrieve_obligations.return_value = [
+            {
+                "periodKey": "18A2",
+                "start": "2017-04-01",
+                "end": "2017-06-30",
+                "due": "2017-08-07",
+                "status": "O",
+            }
+        ]
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("hmrc_vat_workspace"),
+            {
+                "company": tenant.id,
+                "action": "sync_obligations",
+                "from_date": "2026-01-01",
+                "to_date": "2026-12-31",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        connection = HmrcVatConnection.objects.get(tenant=tenant)
+        self.assertEqual(connection.latest_obligations[0]["periodKey"], "18A2")
+
+    @patch("accounting.views.submit_vat_return_payload")
+    def test_vat_workspace_submits_open_obligation_and_records_vat_return(self, submit_payload):
+        tenant = Tenant.objects.create(name="Submit Client Ltd")
+        HmrcVatConnection.objects.create(
+            tenant=tenant,
+            vrn="123456789",
+            status="Connected",
+            access_token="access-token",
+            latest_obligations=[
+                {
+                    "periodKey": "18A2",
+                    "start": "2017-04-01",
+                    "end": "2017-06-30",
+                    "due": "2017-08-07",
+                    "status": "O",
+                }
+            ],
+        )
+        submit_payload.return_value = {"formBundleNumber": "FORM-123"}
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("hmrc_vat_workspace"),
+            {
+                "company": tenant.id,
+                "action": "submit_return",
+                "period_key": "18A2",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        vat_return = VatReturn.objects.get(tenant=tenant, period_key="18A2")
+        self.assertEqual(vat_return.status, "Submitted")
+        self.assertEqual(vat_return.hmrc_receipt_id, "FORM-123")

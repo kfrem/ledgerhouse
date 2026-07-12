@@ -2,7 +2,8 @@ from django.contrib import admin
 from .models import (
     Tenant, NominalAccount, AccountingPeriod, Journal, JournalLine,
     AuditEvent, VatRate, VatDecisionRule, ImportedFile, BankTransaction,
-    EvidenceDocument, JournalEvidenceLink, BankReconciliation, VatReturn, BankFeedConnection
+    EvidenceDocument, JournalEvidenceLink, BankReconciliation, VatReturn,
+    HmrcVatConnection, BankFeedConnection
 )
 
 admin.site.site_header = "LedgerHouse Operations"
@@ -87,6 +88,13 @@ class BankReconciliationAdmin(admin.ModelAdmin):
 class VatReturnAdmin(admin.ModelAdmin):
     list_display = ('id', 'tenant', 'start_date', 'end_date', 'total_output_vat', 'total_input_vat', 'net_vat_payable', 'status', 'hmrc_receipt_id', 'submitted_at', 'locked_at')
     list_filter = ('tenant', 'status')
+
+@admin.register(HmrcVatConnection)
+class HmrcVatConnectionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'tenant', 'vrn', 'status', 'scope', 'last_authorised_at', 'last_obligations_sync_at')
+    list_filter = ('tenant', 'status')
+    readonly_fields = ('created_at', 'updated_at')
+    search_fields = ('tenant__name', 'vrn')
 
 @admin.register(BankFeedConnection)
 class BankFeedConnectionAdmin(admin.ModelAdmin):

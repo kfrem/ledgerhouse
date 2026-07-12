@@ -1,0 +1,187 @@
+{% load static accounting_extras %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | HMRC VAT workspace</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Finaccord Pro</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
+            <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a href="{% url 'hmrc_sandbox_status' %}"><span>03</span> HMRC sandbox</a>
+            <a class="active" href="{% url 'hmrc_vat_workspace' %}"><span>04</span> VAT workspace</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>HMRC VAT</p>
+            <strong>{% if connection.status == "Connected" %}Connected{% else %}Sandbox setup{% endif %}</strong>
+            <small>Review obligations, compare LedgerHouse VAT boxes and file controlled sandbox returns.</small>
+        </section>
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">HMRC VAT workspace</p>
+                <h1>VAT filing control</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'hmrc_sandbox_status' %}">Sandbox status</a>
+                <a class="ghost-button" href="{% url 'practice_dashboard' %}">Practice dashboard</a>
+            </div>
+        </header>
+
+        {% if messages %}
+        <div class="message-list page-messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <section class="surface vat-control-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Client file</p>
+                    <h2>{{ selected_tenant.name|default:"No client selected" }}</h2>
+                </div>
+                <span class="status-pill {% if connection.status != 'Connected' %}warning{% endif %}">
+                    {{ connection.status|default:"NotConnected" }}
+                </span>
+            </div>
+
+            <form class="company-switcher inline-switcher" method="get">
+                <label for="company">Client</label>
+                <select id="company" name="company" onchange="this.form.submit()">
+                    {% for tenant in tenants %}
+                    <option value="{{ tenant.id }}" {% if selected_tenant and tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+
+            <div class="vat-workspace-grid">
+                <form class="vat-card" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save_vrn">
+                    <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                    <span>VAT registration number</span>
+                    <label for="vrn">VRN</label>
+                    <input id="vrn" name="vrn" maxlength="9" inputmode="numeric" value="{{ connection.vrn }}" placeholder="123456789">
+                    <button class="solid-button" type="submit">Save VRN</button>
+                </form>
+
+                <div class="vat-card">
+                    <span>Authorisation</span>
+                    <strong>{% if connection.access_token %}Token stored{% else %}No token stored{% endif %}</strong>
+                    <small>
+                        {% if connection.last_authorised_at %}
+                        Last authorised {{ connection.last_authorised_at|date:"d M Y H:i" }}.
+                        {% else %}
+                        Authorise this client before syncing obligations.
+                        {% endif %}
+                    </small>
+                    {% if selected_tenant and hmrc_status.configured %}
+                    <a class="solid-button" href="{% url 'hmrc_authorise' %}?next={% url 'hmrc_vat_workspace' %}%3Fcompany%3D{{ selected_tenant.id }}">Authorise client</a>
+                    {% else %}
+                    <button class="solid-button" disabled type="button">Authorise client</button>
+                    {% endif %}
+                </div>
+
+                <form class="vat-card" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="sync_obligations">
+                    <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                    <span>HMRC obligations</span>
+                    <div class="date-pair">
+                        <label for="from_date">From</label>
+                        <input id="from_date" type="date" name="from_date" value="2026-01-01">
+                        <label for="to_date">To</label>
+                        <input id="to_date" type="date" name="to_date" value="2026-12-31">
+                    </div>
+                    <button class="solid-button" type="submit">Sync obligations</button>
+                </form>
+            </div>
+        </section>
+
+        <section class="surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Returns queue</p>
+                    <h2>HMRC obligations and LedgerHouse figures</h2>
+                </div>
+                {% if connection.last_obligations_sync_at %}
+                <span class="status-pill">Synced {{ connection.last_obligations_sync_at|date:"d M H:i" }}</span>
+                {% endif %}
+            </div>
+
+            {% if obligations %}
+            <div class="vat-obligation-list">
+                {% for obligation in obligations %}
+                {% with prepared=prepared_returns|get_item:obligation.periodKey %}
+                <article class="vat-obligation-card">
+                    <header>
+                        <div>
+                            <span class="eyebrow">Period {{ obligation.periodKey }}</span>
+                            <h3>{{ obligation.start }} to {{ obligation.end }}</h3>
+                            <small>Due {{ obligation.due }}{% if obligation.received %} | Received {{ obligation.received }}{% endif %}</small>
+                        </div>
+                        <strong class="status-pill {% if obligation.status != 'O' %}warning{% endif %}">
+                            {% if obligation.status == "O" %}Open{% else %}Fulfilled{% endif %}
+                        </strong>
+                    </header>
+
+                    <div class="vat-box-grid">
+                        <div><span>Box 1</span><strong>{{ prepared.vatDueOnOutputs }}</strong><small>VAT due on sales</small></div>
+                        <div><span>Box 3</span><strong>{{ prepared.totalVatDue }}</strong><small>Total VAT due</small></div>
+                        <div><span>Box 4</span><strong>{{ prepared.vatReclaimedCurrPeriod }}</strong><small>VAT reclaimed</small></div>
+                        <div><span>Box 5</span><strong>{{ prepared.netVatDue }}</strong><small>Net VAT due</small></div>
+                        <div><span>Box 6</span><strong>{{ prepared.totalValueSalesExVAT }}</strong><small>Sales ex VAT</small></div>
+                        <div><span>Box 7</span><strong>{{ prepared.totalValuePurchasesExVAT }}</strong><small>Purchases ex VAT</small></div>
+                    </div>
+
+                    <form method="post" class="vat-submit-row">
+                        {% csrf_token %}
+                        <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                        <input type="hidden" name="action" value="submit_return">
+                        <input type="hidden" name="period_key" value="{{ obligation.periodKey }}">
+                        {% if obligation.status == "O" %}
+                        <button class="solid-button" type="submit">Submit sandbox return</button>
+                        {% else %}
+                        <button class="solid-button" type="button" disabled>Already fulfilled</button>
+                        {% endif %}
+                    </form>
+                </article>
+                {% endwith %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No HMRC VAT obligations synced for this client yet.</div>
+            {% endif %}
+        </section>
+
+        {% if connection.last_submission_response %}
+        <section class="surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Last HMRC response</p>
+                    <h2>Submission receipt</h2>
+                </div>
+            </div>
+            <pre class="response-block">{{ connection.last_submission_response|pprint }}</pre>
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>
