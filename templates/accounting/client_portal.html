@@ -123,6 +123,30 @@
                 </div>
             </article>
 
+            <article class="client-panel upload-history-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Received by us</p>
+                        <h2>Recently uploaded</h2>
+                    </div>
+                    <span class="status-pill">{{ evidence_count }} files</span>
+                </div>
+                <div class="document-list">
+                    {% for document in latest_documents %}
+                    <div class="document-item">
+                        <span class="document-icon">DOC</span>
+                        <span>
+                            <strong>{{ document.filename }}</strong>
+                            <small>Uploaded {{ document.uploaded_at|date:"d M Y H:i" }} by {{ document.uploaded_by }}</small>
+                        </span>
+                        <em>Stored</em>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No uploaded evidence yet. Use the upload box and your files will appear here immediately.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
             <article id="requests" class="client-panel">
                 <div class="section-heading">
                     <div>

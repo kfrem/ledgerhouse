@@ -9,7 +9,15 @@ from django.test import Client, TransactionTestCase
 from openpyxl import Workbook
 
 from accounting.intake import process_uploaded_file
-from accounting.models import BankTransaction, EvidenceDocument, Journal, JournalLine, NominalAccount, Tenant
+from accounting.models import (
+    BankTransaction,
+    EvidenceDocument,
+    ImportedFile,
+    Journal,
+    JournalLine,
+    NominalAccount,
+    Tenant,
+)
 from accounting.reports import management_report_csv, management_report_pdf
 
 
@@ -139,6 +147,66 @@ class ClientPortalWorkflowTests(TransactionTestCase):
             filename="receipt.pdf",
             content_type="application/pdf",
         ).exists()
+
+    def test_client_portal_shows_recent_uploads(self):
+        EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="receipt-visible.pdf",
+            file_content=b"%PDF-1.4\n% demo receipt\n",
+            content_type="application/pdf",
+            uploaded_by="client",
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(f"/?company={self.tenant.id}")
+        body = response.content.decode()
+        assert response.status_code == 200
+        assert "Recently uploaded" in body
+        assert "receipt-visible.pdf" in body
+        assert "Stored" in body
+
+    def test_practice_dashboard_surfaces_client_work_queues(self):
+        EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="supplier-invoice.pdf",
+            file_content=b"%PDF-1.4\n% supplier invoice\n",
+            content_type="application/pdf",
+            uploaded_by="client",
+        )
+        imported_file = ImportedFile.objects.create(
+            tenant=self.tenant,
+            filename="bank-statement.csv",
+            raw_content="Date,Amount,Reference,FITID\n2026-07-04,-42.00,Parking,FITID-QUEUE-1\n",
+            file_hash="practice-queue-bank",
+        )
+        BankTransaction.objects.create(
+            tenant=self.tenant,
+            imported_file=imported_file,
+            date="2026-07-04",
+            amount=Decimal("-42.00"),
+            reference="Parking",
+            fitid="FITID-QUEUE-1",
+        )
+        Journal.objects.create(
+            tenant=self.tenant,
+            date="2026-07-04",
+            description="Director card purchase",
+            source_type="SupplierInvoice",
+            source_id="BILL-001",
+            created_by="Test",
+            status="RequiresReview",
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get("/practice/")
+        body = response.content.decode()
+        assert response.status_code == 200
+        assert "Client upload inbox" in body
+        assert "supplier-invoice.pdf" in body
+        assert "Unmatched bank lines" in body
+        assert "Parking" in body
+        assert "Review before release" in body
+        assert "Director card purchase" in body
 
     def test_management_reports_generate_csv_and_pdf(self):
         csv_report = management_report_csv(self.tenant)

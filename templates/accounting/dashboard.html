@@ -185,6 +185,77 @@
                 </article>
             </aside>
 
+            <article class="surface workbench-surface">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Practice workbench</p>
+                        <h2>Client work that needs attention</h2>
+                    </div>
+                    <span class="status-pill">Live queues</span>
+                </div>
+                <div class="workbench-grid">
+                    <section class="queue-panel">
+                        <div class="queue-heading">
+                            <span>01</span>
+                            <strong>Client upload inbox</strong>
+                        </div>
+                        <div class="queue-list">
+                            {% for document in upload_inbox %}
+                            <a class="queue-item" href="/admin/accounting/evidencedocument/{{ document.id }}/change/">
+                                <span>
+                                    <strong>{{ document.filename }}</strong>
+                                    <small>{{ document.tenant.name }} | {{ document.uploaded_at|date:"d M Y H:i" }}</small>
+                                </span>
+                                <em>Evidence</em>
+                            </a>
+                            {% empty %}
+                            <div class="empty-state">No client uploads are waiting.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="queue-panel">
+                        <div class="queue-heading">
+                            <span>02</span>
+                            <strong>Unmatched bank lines</strong>
+                        </div>
+                        <div class="queue-list">
+                            {% for transaction in unmatched_bank_transactions %}
+                            <a class="queue-item" href="/admin/accounting/banktransaction/{{ transaction.id }}/change/">
+                                <span>
+                                    <strong>{{ transaction.reference }}</strong>
+                                    <small>{{ transaction.tenant.name }} | {{ transaction.date }} | {{ transaction.imported_file.filename }}</small>
+                                </span>
+                                <em>GBP {{ transaction.amount }}</em>
+                            </a>
+                            {% empty %}
+                            <div class="empty-state">All imported bank lines are matched.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="queue-panel">
+                        <div class="queue-heading">
+                            <span>03</span>
+                            <strong>Review before release</strong>
+                        </div>
+                        <div class="queue-list">
+                            {% for journal in review_journals %}
+                            <a class="queue-item" href="/admin/accounting/journal/{{ journal.id }}/change/">
+                                <span>
+                                    <strong>{{ journal.description }}</strong>
+                                    <small>{{ journal.tenant.name }} | {{ journal.date }} | {{ journal.source_type }}</small>
+                                </span>
+                                <em>{{ journal.status }}</em>
+                            </a>
+                            {% empty %}
+                            <div class="empty-state">No journals are currently marked for review.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                </div>
+            </article>
+
             <article class="surface activity-surface">
                 <div class="section-heading">
                     <div>

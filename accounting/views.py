@@ -168,6 +168,17 @@ def practice_dashboard(request):
 
     vat_returns = VatReturn.objects.select_related("tenant").order_by("-end_date")[:5]
     recent_journals = Journal.objects.select_related("tenant").order_by("-created_at")[:6]
+    upload_inbox = EvidenceDocument.objects.select_related("tenant").order_by("-uploaded_at")[:8]
+    unmatched_bank_transactions = (
+        BankTransaction.objects.exclude(id__in=reconciled_ids)
+        .select_related("tenant", "imported_file")
+        .order_by("-date", "-id")[:8]
+    )
+    review_journals = (
+        Journal.objects.filter(status="RequiresReview")
+        .select_related("tenant")
+        .order_by("-created_at")[:8]
+    )
 
     context = {
         "tenants": tenants,
@@ -182,5 +193,8 @@ def practice_dashboard(request):
         "vat_due": _money(vat_due),
         "vat_returns": vat_returns,
         "recent_journals": recent_journals,
+        "upload_inbox": upload_inbox,
+        "unmatched_bank_transactions": unmatched_bank_transactions,
+        "review_journals": review_journals,
     }
     return render(request, "accounting/dashboard.html", context)

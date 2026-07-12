@@ -341,6 +341,10 @@ input {
     grid-column: 1 / -1;
 }
 
+.workbench-surface {
+    grid-column: 1 / -1;
+}
+
 .metric,
 .surface,
 .module-tile {
@@ -910,6 +914,108 @@ input {
     margin-top: 18px;
 }
 
+.document-list,
+.queue-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.document-item,
+.queue-item {
+    display: grid;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid #e8efed;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.document-item {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    padding: 13px;
+}
+
+.document-icon {
+    display: grid;
+    width: 52px;
+    height: 52px;
+    place-items: center;
+    border-radius: 8px;
+    background: #edf7f4;
+    color: var(--green-dark);
+    font-size: 0.74rem;
+    font-weight: 900;
+}
+
+.document-item strong,
+.document-item small,
+.queue-item strong,
+.queue-item small {
+    display: block;
+}
+
+.document-item small,
+.queue-item small {
+    margin-top: 4px;
+    color: var(--muted);
+    line-height: 1.4;
+}
+
+.document-item em,
+.queue-item em {
+    min-width: max-content;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #eef6f3;
+    color: var(--green-dark);
+    font-style: normal;
+    font-weight: 850;
+}
+
+.workbench-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.queue-panel {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid #e3eeea;
+    border-radius: 8px;
+    background: #f8fbfa;
+}
+
+.queue-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.queue-heading span {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--green-dark);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 900;
+}
+
+.queue-heading strong {
+    font-size: 1.02rem;
+}
+
+.queue-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 76px;
+    padding: 12px;
+}
+
 .request-item,
 .report-item,
 .activity-item {
@@ -1072,7 +1178,8 @@ input {
     .hero-panel,
     .content-grid,
     .client-hero,
-    .client-grid {
+    .client-grid,
+    .workbench-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -1109,6 +1216,8 @@ input {
 
     .client-row,
     .stack-item,
+    .document-item,
+    .queue-item,
     .table-row {
         grid-template-columns: 1fr;
     }
