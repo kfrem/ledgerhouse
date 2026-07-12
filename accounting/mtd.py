@@ -2,6 +2,7 @@ import uuid
 import json
 import urllib.parse
 import urllib.request
+import urllib.error
 from datetime import datetime
 from decimal import Decimal
 from django.conf import settings
@@ -12,6 +13,15 @@ from accounting.models import VatReturn, JournalLine
 
 
 VAT_MTD_SCOPE = "read:vat write:vat"
+
+
+class HmrcApiError(RuntimeError):
+    """Raised when HMRC returns a non-success response."""
+
+    def __init__(self, status_code, message, payload=None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.payload = payload or {}
 
 
 def hmrc_sandbox_status():
@@ -95,6 +105,73 @@ def build_desktop_fraud_prevention_headers(device_id, public_ip="127.0.0.1"):
         "Gov-Client-User-Agent": "LedgerHouse/local-sandbox",
         "Gov-Vendor-Version": "LedgerHouse=local",
     }
+
+
+def _hmrc_json_request(url, access_token, method="GET", payload=None, headers=None):
+    request_headers = {
+        "Accept": "application/vnd.hmrc.1.0+json",
+        "Authorization": f"Bearer {access_token}",
+        **(headers or {}),
+    }
+    data = None
+    if payload is not None:
+        request_headers["Content-Type"] = "application/json"
+        data = json.dumps(payload).encode("utf-8")
+
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers=request_headers,
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            response_body = response.read().decode("utf-8")
+            return {
+                "status": response.status,
+                "payload": json.loads(response_body) if response_body else {},
+            }
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8")
+        try:
+            error_payload = json.loads(error_body)
+        except json.JSONDecodeError:
+            error_payload = {"message": error_body}
+        message = error_payload.get("message") or error_payload.get("code") or str(exc)
+        raise HmrcApiError(exc.code, message, error_payload) from exc
+
+
+def retrieve_vat_obligations(access_token, vrn, from_date, to_date, device_id, public_ip="127.0.0.1"):
+    params = urllib.parse.urlencode({"from": from_date, "to": to_date})
+    url = f"{settings.HMRC_API_BASE_URL}/organisations/vat/{vrn}/obligations?{params}"
+    response = _hmrc_json_request(
+        url,
+        access_token,
+        headers=build_desktop_fraud_prevention_headers(device_id, public_ip),
+    )
+    return response["payload"].get("obligations", [])
+
+
+def retrieve_vat_return(access_token, vrn, period_key, device_id, public_ip="127.0.0.1"):
+    url = f"{settings.HMRC_API_BASE_URL}/organisations/vat/{vrn}/returns/{period_key}"
+    response = _hmrc_json_request(
+        url,
+        access_token,
+        headers=build_desktop_fraud_prevention_headers(device_id, public_ip),
+    )
+    return response["payload"]
+
+
+def submit_vat_return_payload(access_token, vrn, payload, device_id, public_ip="127.0.0.1"):
+    url = f"{settings.HMRC_API_BASE_URL}/organisations/vat/{vrn}/returns"
+    response = _hmrc_json_request(
+        url,
+        access_token,
+        method="POST",
+        payload=payload,
+        headers=build_desktop_fraud_prevention_headers(device_id, public_ip),
+    )
+    return response["payload"]
 
 class MockHMRCClient:
     """Mock client simulating HMRC's MTD for VAT submission endpoint."""

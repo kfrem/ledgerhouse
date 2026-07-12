@@ -1,14 +1,20 @@
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
+import io
+import urllib.error
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounting.mtd import (
+    HmrcApiError,
     build_desktop_fraud_prevention_headers,
     build_hmrc_authorisation_url,
     hmrc_sandbox_status,
+    retrieve_vat_obligations,
+    retrieve_vat_return,
+    submit_vat_return_payload,
 )
 
 
@@ -108,3 +114,90 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertEqual(headers["Gov-Client-Device-ID"], "device-123")
         self.assertEqual(headers["Gov-Client-Public-IP"], "203.0.113.10")
         self.assertIn("Gov-Vendor-Version", headers)
+
+    @override_settings(HMRC_API_BASE_URL="https://test-api.service.hmrc.gov.uk")
+    @patch("accounting.mtd.urllib.request.urlopen")
+    def test_retrieve_vat_obligations_calls_hmrc_with_fraud_headers(self, urlopen):
+        urlopen.return_value.__enter__.return_value.status = 200
+        urlopen.return_value.__enter__.return_value.read.return_value = (
+            b'{"obligations":[{"periodKey":"18A2","status":"O"}]}'
+        )
+
+        obligations = retrieve_vat_obligations(
+            "access-token",
+            "123456789",
+            "2026-01-01",
+            "2026-12-31",
+            "device-123",
+        )
+
+        request = urlopen.call_args.args[0]
+        self.assertIn("/organisations/vat/123456789/obligations?", request.full_url)
+        self.assertEqual(request.headers["Authorization"], "Bearer access-token")
+        self.assertEqual(request.headers["Gov-client-device-id"], "device-123")
+        self.assertEqual(obligations[0]["periodKey"], "18A2")
+
+    @override_settings(HMRC_API_BASE_URL="https://test-api.service.hmrc.gov.uk")
+    @patch("accounting.mtd.urllib.request.urlopen")
+    def test_submit_and_retrieve_vat_return_payloads(self, urlopen):
+        submit_response = urlopen.return_value.__enter__.return_value
+        submit_response.status = 201
+        submit_response.read.return_value = b'{"formBundleNumber":"123"}'
+
+        payload = {
+            "periodKey": "18A2",
+            "vatDueSales": 105.50,
+            "vatDueAcquisitions": 0.00,
+            "totalVatDue": 105.50,
+            "vatReclaimedCurrPeriod": 25.25,
+            "netVatDue": 80.25,
+            "totalValueSalesExVAT": 1000,
+            "totalValuePurchasesExVAT": 250,
+            "totalValueGoodsSuppliedExVAT": 0,
+            "totalAcquisitionsExVAT": 0,
+            "finalised": True,
+        }
+
+        result = submit_vat_return_payload(
+            "access-token",
+            "123456789",
+            payload,
+            "device-123",
+        )
+
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.get_method(), "POST")
+        self.assertIn("/organisations/vat/123456789/returns", request.full_url)
+        self.assertEqual(result["formBundleNumber"], "123")
+
+        retrieve_response = urlopen.return_value.__enter__.return_value
+        retrieve_response.status = 200
+        retrieve_response.read.return_value = b'{"periodKey":"18A2","netVatDue":80.25}'
+
+        retrieved = retrieve_vat_return("access-token", "123456789", "18A2", "device-123")
+
+        self.assertEqual(retrieved["periodKey"], "18A2")
+        self.assertEqual(retrieved["netVatDue"], 80.25)
+
+    @override_settings(HMRC_API_BASE_URL="https://test-api.service.hmrc.gov.uk")
+    @patch("accounting.mtd.urllib.request.urlopen")
+    def test_hmrc_error_preserves_status_and_payload(self, urlopen):
+        urlopen.side_effect = urllib.error.HTTPError(
+            "https://test-api.service.hmrc.gov.uk/test",
+            400,
+            "Bad Request",
+            {},
+            io.BytesIO(b'{"code":"INVALID_DATE_RANGE","message":"Invalid date range"}'),
+        )
+
+        with self.assertRaises(HmrcApiError) as raised:
+            retrieve_vat_obligations(
+                "access-token",
+                "123456789",
+                "2026-01-01",
+                "2027-12-31",
+                "device-123",
+            )
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertEqual(raised.exception.payload["code"], "INVALID_DATE_RANGE")
