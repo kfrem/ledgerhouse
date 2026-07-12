@@ -1,0 +1,235 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Client portal</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body class="client-page">
+    <aside class="sidebar client-sidebar" aria-label="Client navigation">
+        <a class="brand" href="{% url 'client_portal' %}" aria-label="LedgerHouse client portal">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Your accounts department</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a class="active" href="{% url 'client_portal' %}"><span>01</span> Home</a>
+            <a href="#upload"><span>02</span> Upload files</a>
+            <a href="#requests"><span>03</span> Requests</a>
+            <a href="#reports"><span>04</span> Reports</a>
+            <a href="#support"><span>05</span> Ask accountant</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Logged in as client</p>
+            <strong>{{ selected_tenant.name|default:"Demo company" }}</strong>
+            <small>Your accountant prepares the books, reports and compliance work behind the scenes.</small>
+        </section>
+    </aside>
+
+    <main class="workspace client-workspace">
+        <header class="topbar client-topbar">
+            <div>
+                <p class="eyebrow">Client workspace</p>
+                <h1>Your accounts department</h1>
+            </div>
+            <div class="topbar-actions">
+                <form action="{% url 'logout' %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="solid-button">Sign out</button>
+                </form>
+            </div>
+        </header>
+
+        <section class="client-hero">
+            <div class="client-hero-copy">
+                <p class="eyebrow">Good afternoon</p>
+                <h2>{{ selected_tenant.name|default:"Your company" }} finance hub</h2>
+                <p>Your job is simple: upload receipts, invoices, bank files and spreadsheets. Your accounts team turns them into bookkeeping, VAT, reports and advice.</p>
+                <div class="hero-actions">
+                    <a class="solid-button" href="#upload">Upload documents</a>
+                    <a class="ghost-button dark" href="#reports">View reports</a>
+                </div>
+            </div>
+            <form class="company-switcher" method="get">
+                <label for="company">Viewing company</label>
+                <select id="company" name="company" onchange="this.form.submit()">
+                    {% for tenant in tenants %}
+                    <option value="{{ tenant.id }}" {% if tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
+                    {% endfor %}
+                </select>
+                <small>Demo selector for reviewing the seeded client records.</small>
+            </form>
+        </section>
+
+        <section class="client-status-grid" aria-label="Client status">
+            <article class="client-status-card ready">
+                <span>Documents uploaded</span>
+                <strong>{{ evidence_count }}</strong>
+                <small>Receipts, invoices and evidence in the vault</small>
+            </article>
+            <article class="client-status-card">
+                <span>Bank activity</span>
+                <strong>{{ bank_count }}</strong>
+                <small>{{ unreconciled_count }} items still being matched</small>
+            </article>
+            <article class="client-status-card">
+                <span>Bookkeeping entries</span>
+                <strong>{{ journal_count }}</strong>
+                <small>Prepared from your records</small>
+            </article>
+            <article class="client-status-card attention">
+                <span>VAT estimate</span>
+                <strong>{{ vat_due }}</strong>
+                <small>Latest figures available to review</small>
+            </article>
+        </section>
+
+        <section class="client-grid">
+            <article id="upload" class="client-panel upload-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Send us your paperwork</p>
+                        <h2>Upload anything finance-related</h2>
+                    </div>
+                    <span class="status-pill">Design preview</span>
+                </div>
+                <div class="dropzone">
+                    <strong>Drop receipts, invoices, photos, PDFs or spreadsheets here</strong>
+                    <span>Or choose files from your computer. The next build will connect this to secure file intake.</span>
+                    <button class="solid-button" type="button">Choose files</button>
+                </div>
+                <div class="upload-types">
+                    <span>Invoices</span>
+                    <span>Expense photos</span>
+                    <span>Bank CSV/XLSX</span>
+                    <span>Payroll files</span>
+                    <span>Contracts</span>
+                </div>
+            </article>
+
+            <article id="requests" class="client-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Action needed</p>
+                        <h2>Requests from your accountant</h2>
+                    </div>
+                </div>
+                <div class="request-list">
+                    <div class="request-item">
+                        <span class="request-dot"></span>
+                        <div>
+                            <strong>Confirm unmatched bank items</strong>
+                            <small>{{ unreconciled_count }} transactions need explanation or receipt support.</small>
+                        </div>
+                    </div>
+                    <div class="request-item">
+                        <span class="request-dot gold"></span>
+                        <div>
+                            <strong>Upload missing purchase invoices</strong>
+                            <small>Your accountant will use these to complete VAT and management reports.</small>
+                        </div>
+                    </div>
+                    <div class="request-item muted">
+                        <span class="request-dot green"></span>
+                        <div>
+                            <strong>Review draft monthly numbers</strong>
+                            <small>Management pack area is prepared for the next build phase.</small>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="client-panel business-health">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Business health</p>
+                        <h2>Plain-English figures</h2>
+                    </div>
+                </div>
+                <div class="health-grid">
+                    <div>
+                        <span>Income recorded</span>
+                        <strong>{{ revenue }}</strong>
+                    </div>
+                    <div>
+                        <span>Costs recorded</span>
+                        <strong>{{ expenses }}</strong>
+                    </div>
+                    <div>
+                        <span>Estimated profit</span>
+                        <strong>{{ profit }}</strong>
+                    </div>
+                </div>
+            </article>
+
+            <article id="reports" class="client-panel reports-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Ready for you</p>
+                        <h2>Reports and downloads</h2>
+                    </div>
+                </div>
+                <div class="report-list">
+                    {% for vat_return in vat_returns %}
+                    <div class="report-item">
+                        <span>
+                            <strong>VAT summary</strong>
+                            <small>{{ vat_return.start_date }} to {{ vat_return.end_date }}</small>
+                        </span>
+                        <em>{{ vat_return.status }}</em>
+                    </div>
+                    {% empty %}
+                    <div class="report-item">
+                        <span>
+                            <strong>Monthly management report</strong>
+                            <small>Will appear here when prepared by your accountant.</small>
+                        </span>
+                        <em>Coming</em>
+                    </div>
+                    {% endfor %}
+                    <div class="report-item">
+                        <span>
+                            <strong>Profit and loss pack</strong>
+                            <small>Designed for owner-manager review.</small>
+                        </span>
+                        <em>Draft</em>
+                    </div>
+                </div>
+            </article>
+
+            <article class="client-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Recently processed</p>
+                        <h2>What your accounts team has done</h2>
+                    </div>
+                </div>
+                <div class="client-activity">
+                    {% for journal in latest_journals %}
+                    <div class="activity-item">
+                        <span>{{ journal.date }}</span>
+                        <strong>{{ journal.description }}</strong>
+                        <small>{{ journal.source_type }} - {{ journal.status }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No processed records yet.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article id="support" class="client-panel support-panel">
+                <p class="eyebrow">Need advice?</p>
+                <h2>Ask your accountant</h2>
+                <p>Use this area to request help with cash flow, tax, payroll, pricing, funding, or management decisions.</p>
+                <button class="solid-button" type="button">Start a question</button>
+            </article>
+        </section>
+    </main>
+</body>
+</html>

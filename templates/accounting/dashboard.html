@@ -9,7 +9,7 @@
 </head>
 <body>
     <aside class="sidebar" aria-label="Main navigation">
-        <a class="brand" href="{% url 'dashboard' %}" aria-label="LedgerHouse dashboard">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
             <span class="brand-mark">LH</span>
             <span>
                 <strong>LedgerHouse</strong>
@@ -18,12 +18,12 @@
         </a>
 
         <nav class="nav-list">
-            <a class="active" href="{% url 'dashboard' %}"><span>01</span> Overview</a>
-            <a href="/admin/accounting/tenant/"><span>02</span> Clients</a>
-            <a href="/admin/accounting/journal/"><span>03</span> Ledger</a>
-            <a href="/admin/accounting/banktransaction/"><span>04</span> Banking</a>
-            <a href="/admin/accounting/vatreturn/"><span>05</span> VAT</a>
-            <a href="/admin/accounting/evidencedocument/"><span>06</span> Evidence</a>
+            <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
+            <a class="active" href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a href="/admin/accounting/tenant/"><span>03</span> Clients</a>
+            <a href="/admin/accounting/journal/"><span>04</span> Ledger</a>
+            <a href="/admin/accounting/banktransaction/"><span>05</span> Banking</a>
+            <a href="/admin/accounting/vatreturn/"><span>06</span> VAT</a>
         </nav>
 
         <section class="sidebar-panel">

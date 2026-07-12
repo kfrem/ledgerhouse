@@ -21,7 +21,84 @@ def _money(value):
 
 
 @login_required(login_url="/login/")
-def dashboard(request):
+def client_portal(request):
+    tenants = list(Tenant.objects.order_by("name"))
+    selected_tenant = None
+    requested_tenant = request.GET.get("company")
+
+    if requested_tenant:
+        selected_tenant = next(
+            (tenant for tenant in tenants if str(tenant.id) == requested_tenant),
+            None,
+        )
+    if selected_tenant is None and tenants:
+        selected_tenant = tenants[0]
+
+    revenue = Decimal("0")
+    expenses = Decimal("0")
+    vat_due = Decimal("0")
+    bank_count = 0
+    unreconciled_count = 0
+    evidence_count = 0
+    journal_count = 0
+    latest_documents = []
+    latest_journals = []
+    vat_returns = []
+
+    if selected_tenant:
+        revenue = JournalLine.objects.filter(
+            tenant=selected_tenant,
+            account__category="Revenue",
+        ).aggregate(total=Sum("credit"))["total"] or Decimal("0")
+        expenses = JournalLine.objects.filter(
+            Q(account__category="Expense") | Q(account__category="Cost of Sales"),
+            tenant=selected_tenant,
+        ).aggregate(total=Sum("debit"))["total"] or Decimal("0")
+        vat_due = VatReturn.objects.filter(tenant=selected_tenant).aggregate(
+            total=Sum("net_vat_payable")
+        )["total"] or Decimal("0")
+
+        reconciled_ids = BankReconciliation.objects.filter(
+            tenant=selected_tenant
+        ).values("bank_transaction_id")
+        bank_count = BankTransaction.objects.filter(tenant=selected_tenant).count()
+        unreconciled_count = (
+            BankTransaction.objects.filter(tenant=selected_tenant)
+            .exclude(id__in=reconciled_ids)
+            .count()
+        )
+        evidence_count = EvidenceDocument.objects.filter(tenant=selected_tenant).count()
+        journal_count = Journal.objects.filter(tenant=selected_tenant).count()
+        latest_documents = EvidenceDocument.objects.filter(
+            tenant=selected_tenant
+        ).order_by("-uploaded_at")[:4]
+        latest_journals = Journal.objects.filter(
+            tenant=selected_tenant
+        ).order_by("-created_at")[:5]
+        vat_returns = VatReturn.objects.filter(
+            tenant=selected_tenant
+        ).order_by("-end_date")[:3]
+
+    context = {
+        "tenants": tenants,
+        "selected_tenant": selected_tenant,
+        "revenue": _money(revenue),
+        "expenses": _money(expenses),
+        "profit": _money(revenue - expenses),
+        "vat_due": _money(vat_due),
+        "bank_count": bank_count,
+        "unreconciled_count": unreconciled_count,
+        "evidence_count": evidence_count,
+        "journal_count": journal_count,
+        "latest_documents": latest_documents,
+        "latest_journals": latest_journals,
+        "vat_returns": vat_returns,
+    }
+    return render(request, "accounting/client_portal.html", context)
+
+
+@login_required(login_url="/login/")
+def practice_dashboard(request):
     tenants = list(
         Tenant.objects.annotate(
             journals_count=Count("journal", distinct=True),
