@@ -221,6 +221,51 @@ class HmrcVatConnection(models.Model):
         return f"HMRC VAT {label} ({self.status}) for Tenant {self.tenant_id}"
 
 
+class VatReview(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='vat_reviews')
+    period_key = models.CharField(max_length=10)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    due_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, default='Draft')  # Draft, Ready, ClientApproved, Submitted
+    prepared_payload = models.JSONField(default=dict, blank=True)
+    evidence_complete = models.BooleanField(default=False)
+    bank_reconciled = models.BooleanField(default=False)
+    vat_codes_reviewed = models.BooleanField(default=False)
+    exceptions_resolved = models.BooleanField(default=False)
+    client_approved = models.BooleanField(default=False)
+    client_approved_at = models.DateTimeField(null=True, blank=True)
+    client_approved_by = models.CharField(max_length=100, blank=True, default='')
+    practice_approved_at = models.DateTimeField(null=True, blank=True)
+    practice_approved_by = models.CharField(max_length=100, blank=True, default='')
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    hmrc_receipt_id = models.CharField(max_length=100, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('tenant', 'period_key')
+
+    @property
+    def checklist_complete(self):
+        return all(
+            [
+                self.evidence_complete,
+                self.bank_reconciled,
+                self.vat_codes_reviewed,
+                self.exceptions_resolved,
+            ]
+        )
+
+    @property
+    def ready_to_submit(self):
+        return self.checklist_complete and self.client_approved
+
+    def __str__(self):
+        return f"VAT review {self.period_key} for {self.tenant_id} ({self.status})"
+
+
 class BankFeedConnection(models.Model):
     id = models.BigAutoField(primary_key=True)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)

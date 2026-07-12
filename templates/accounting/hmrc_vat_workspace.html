@@ -130,6 +130,7 @@
             <div class="vat-obligation-list">
                 {% for obligation in obligations %}
                 {% with prepared=prepared_returns|get_item:obligation.periodKey %}
+                {% with review=vat_reviews|get_item:obligation.periodKey %}
                 <article class="vat-obligation-card">
                     <header>
                         <div>
@@ -151,18 +152,44 @@
                         <div><span>Box 7</span><strong>{{ prepared.totalValuePurchasesExVAT }}</strong><small>Purchases ex VAT</small></div>
                     </div>
 
+                    <form method="post" class="vat-review-checklist">
+                        {% csrf_token %}
+                        <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                        <input type="hidden" name="action" value="update_review">
+                        <input type="hidden" name="period_key" value="{{ obligation.periodKey }}">
+                        <div class="checklist-heading">
+                            <strong>Practice checklist</strong>
+                            <span class="status-pill {% if not review.ready_to_submit %}warning{% endif %}">
+                                {% if review.ready_to_submit %}Ready to submit{% elif review.client_approved %}Client approved{% elif review.checklist_complete %}Awaiting client{% else %}In review{% endif %}
+                            </span>
+                        </div>
+                        <label><input type="checkbox" name="evidence_complete" {% if review.evidence_complete %}checked{% endif %}> Evidence pack complete</label>
+                        <label><input type="checkbox" name="bank_reconciled" {% if review.bank_reconciled %}checked{% endif %}> Bank reconciled</label>
+                        <label><input type="checkbox" name="vat_codes_reviewed" {% if review.vat_codes_reviewed %}checked{% endif %}> VAT codes reviewed</label>
+                        <label><input type="checkbox" name="exceptions_resolved" {% if review.exceptions_resolved %}checked{% endif %}> Exceptions resolved</label>
+                        <div class="approval-strip">
+                            <span>Client approval</span>
+                            <strong>{% if review.client_approved %}Approved {{ review.client_approved_at|date:"d M Y H:i" }}{% else %}Waiting{% endif %}</strong>
+                            <a class="text-link" href="{% url 'client_vat_review' %}?company={{ selected_tenant.id }}">Client review page</a>
+                        </div>
+                        <button class="ghost-button" type="submit">Save checklist</button>
+                    </form>
+
                     <form method="post" class="vat-submit-row">
                         {% csrf_token %}
                         <input type="hidden" name="company" value="{{ selected_tenant.id }}">
                         <input type="hidden" name="action" value="submit_return">
                         <input type="hidden" name="period_key" value="{{ obligation.periodKey }}">
-                        {% if obligation.status == "O" %}
+                        {% if obligation.status == "O" and review.ready_to_submit %}
                         <button class="solid-button" type="submit">Submit sandbox return</button>
+                        {% elif obligation.status == "O" %}
+                        <button class="solid-button" type="button" disabled>Complete approvals first</button>
                         {% else %}
                         <button class="solid-button" type="button" disabled>Already fulfilled</button>
                         {% endif %}
                     </form>
                 </article>
+                {% endwith %}
                 {% endwith %}
                 {% endfor %}
             </div>

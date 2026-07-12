@@ -1,0 +1,127 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | VAT approval</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body class="client-page">
+    <aside class="sidebar client-sidebar" aria-label="Main navigation">
+        <a class="brand" href="{% url 'client_portal' %}" aria-label="LedgerHouse client portal">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Client portal</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}"><span>01</span> Uploads</a>
+            <a class="active" href="{% url 'client_vat_review' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}"><span>02</span> VAT approval</a>
+            <a href="{% url 'practice_dashboard' %}"><span>03</span> Practice</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Client approval</p>
+            <strong>VAT filing</strong>
+            <small>Approve prepared VAT figures before your accountant files them with HMRC.</small>
+        </section>
+    </aside>
+
+    <main class="workspace client-workspace">
+        <header class="topbar client-topbar">
+            <div>
+                <p class="eyebrow">Client VAT approval</p>
+                <h1>Review VAT before filing</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'client_portal' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}">Client portal</a>
+            </div>
+        </header>
+
+        {% if messages %}
+        <div class="message-list page-messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <section class="client-hero">
+            <div class="client-hero-copy">
+                <p class="eyebrow">Approval pack</p>
+                <h2>{{ selected_tenant.name|default:"Select a company" }}</h2>
+                <p>Review the VAT period, due date and 9-box summary prepared from the ledger. Your approval releases the return to the practice filing queue.</p>
+            </div>
+            <form class="company-switcher" method="get">
+                <label for="company">Company</label>
+                <select id="company" name="company" onchange="this.form.submit()">
+                    {% for tenant in tenants %}
+                    <option value="{{ tenant.id }}" {% if selected_tenant and tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
+                    {% endfor %}
+                </select>
+                <small>The approval is recorded against this company file.</small>
+            </form>
+        </section>
+
+        <section class="surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">VAT reviews</p>
+                    <h2>Approval queue</h2>
+                </div>
+            </div>
+
+            {% if reviews %}
+            <div class="vat-obligation-list">
+                {% for review in reviews %}
+                <article class="vat-obligation-card">
+                    <header>
+                        <div>
+                            <span class="eyebrow">Period {{ review.period_key }}</span>
+                            <h3>{{ review.start_date }} to {{ review.end_date }}</h3>
+                            <small>{% if review.due_date %}Due {{ review.due_date }}{% else %}Due date not supplied{% endif %}</small>
+                        </div>
+                        <strong class="status-pill {% if not review.ready_to_submit %}warning{% endif %}">{{ review.status }}</strong>
+                    </header>
+
+                    <div class="vat-box-grid">
+                        <div><span>Box 1</span><strong>{{ review.prepared_payload.vatDueOnOutputs }}</strong><small>VAT due on sales</small></div>
+                        <div><span>Box 3</span><strong>{{ review.prepared_payload.totalVatDue }}</strong><small>Total VAT due</small></div>
+                        <div><span>Box 4</span><strong>{{ review.prepared_payload.vatReclaimedCurrPeriod }}</strong><small>VAT reclaimed</small></div>
+                        <div><span>Box 5</span><strong>{{ review.prepared_payload.netVatDue }}</strong><small>Net VAT due</small></div>
+                        <div><span>Box 6</span><strong>{{ review.prepared_payload.totalValueSalesExVAT }}</strong><small>Sales ex VAT</small></div>
+                        <div><span>Box 7</span><strong>{{ review.prepared_payload.totalValuePurchasesExVAT }}</strong><small>Purchases ex VAT</small></div>
+                    </div>
+
+                    <div class="approval-strip client-approval">
+                        <span>Practice checklist</span>
+                        <strong>{% if review.checklist_complete %}Complete{% else %}In progress{% endif %}</strong>
+                        <span>Client approval</span>
+                        <strong>{% if review.client_approved %}Approved{% else %}Waiting{% endif %}</strong>
+                    </div>
+
+                    <form method="post" class="vat-submit-row">
+                        {% csrf_token %}
+                        <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                        <input type="hidden" name="period_key" value="{{ review.period_key }}">
+                        {% if review.checklist_complete and not review.client_approved %}
+                        <button class="solid-button" type="submit">Approve for filing</button>
+                        {% elif review.client_approved %}
+                        <button class="solid-button" type="button" disabled>Approved</button>
+                        {% else %}
+                        <button class="solid-button" type="button" disabled>Waiting for accountant review</button>
+                        {% endif %}
+                    </form>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No VAT reviews are ready for this company yet.</div>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>

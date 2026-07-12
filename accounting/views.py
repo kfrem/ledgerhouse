@@ -31,6 +31,7 @@ from .models import (
     JournalLine,
     Tenant,
     VatReturn,
+    VatReview,
 )
 from .reports import management_report_csv, management_report_pdf
 
@@ -53,6 +54,32 @@ def _selected_tenant(request):
     if selected_tenant is None and tenants:
         selected_tenant = tenants[0]
     return tenants, selected_tenant
+
+
+def _ensure_vat_review_for_obligation(tenant, obligation):
+    prepared = serialize_vat_return_9_box(
+        tenant,
+        obligation["start"],
+        obligation["end"],
+    )
+    prepared["periodKey"] = obligation["periodKey"]
+    review, created = VatReview.objects.get_or_create(
+        tenant=tenant,
+        period_key=obligation["periodKey"],
+        defaults={
+            "start_date": date.fromisoformat(obligation["start"]),
+            "end_date": date.fromisoformat(obligation["end"]),
+            "due_date": date.fromisoformat(obligation["due"]) if obligation.get("due") else None,
+            "prepared_payload": prepared,
+        },
+    )
+    if not created:
+        review.start_date = date.fromisoformat(obligation["start"])
+        review.end_date = date.fromisoformat(obligation["end"])
+        review.due_date = date.fromisoformat(obligation["due"]) if obligation.get("due") else None
+        review.prepared_payload = prepared
+        review.save(update_fields=["start_date", "end_date", "due_date", "prepared_payload", "updated_at"])
+    return review, prepared
 
 
 @login_required(login_url="/login/")
@@ -237,6 +264,7 @@ def hmrc_vat_workspace(request):
     connection = None
     obligations = []
     prepared_returns = {}
+    vat_reviews = {}
 
     if selected_tenant:
         connection, _ = HmrcVatConnection.objects.get_or_create(tenant=selected_tenant)
@@ -268,9 +296,33 @@ def hmrc_vat_workspace(request):
                     connection.latest_obligations = obligations
                     connection.last_obligations_sync_at = timezone.now()
                     connection.save(update_fields=["latest_obligations", "last_obligations_sync_at", "updated_at"])
+                    for obligation in obligations:
+                        _ensure_vat_review_for_obligation(selected_tenant, obligation)
                     messages.success(request, f"Synced {len(obligations)} HMRC VAT obligation(s).")
                 except HmrcApiError as exc:
                     messages.error(request, f"HMRC obligations sync failed: {exc}")
+            return redirect(f"{request.path}?company={selected_tenant.id}")
+
+        if action == "update_review":
+            period_key = request.POST.get("period_key")
+            review = VatReview.objects.filter(tenant=selected_tenant, period_key=period_key).first()
+            if not review:
+                messages.error(request, "Sync HMRC obligations before reviewing this period.")
+            else:
+                review.evidence_complete = request.POST.get("evidence_complete") == "on"
+                review.bank_reconciled = request.POST.get("bank_reconciled") == "on"
+                review.vat_codes_reviewed = request.POST.get("vat_codes_reviewed") == "on"
+                review.exceptions_resolved = request.POST.get("exceptions_resolved") == "on"
+                if review.checklist_complete:
+                    review.status = "Ready" if not review.client_approved else "ClientApproved"
+                    review.practice_approved_at = timezone.now()
+                    review.practice_approved_by = request.user.get_username() or "practice"
+                else:
+                    review.status = "Draft"
+                    review.practice_approved_at = None
+                    review.practice_approved_by = ""
+                review.save()
+                messages.success(request, f"Review checklist saved for VAT period {period_key}.")
             return redirect(f"{request.path}?company={selected_tenant.id}")
 
         if action == "submit_return":
@@ -279,14 +331,17 @@ def hmrc_vat_workspace(request):
                 (item for item in connection.latest_obligations if item.get("periodKey") == period_key),
                 None,
             )
+            review = VatReview.objects.filter(tenant=selected_tenant, period_key=period_key).first()
             if not connection.access_token or not connection.vrn:
                 messages.error(request, "Authorise HMRC and save a VRN before submitting.")
             elif not matching_obligation:
                 messages.error(request, "Sync HMRC obligations before submitting this period.")
             elif matching_obligation.get("status") != "O":
                 messages.error(request, "Only open HMRC VAT periods can be submitted.")
+            elif not review or not review.ready_to_submit:
+                messages.error(request, "Complete the practice checklist and client approval before HMRC submission.")
             else:
-                payload = serialize_vat_return_9_box(
+                payload = review.prepared_payload or serialize_vat_return_9_box(
                     selected_tenant,
                     matching_obligation["start"],
                     matching_obligation["end"],
@@ -317,6 +372,10 @@ def hmrc_vat_workspace(request):
                             "submitted_at": timezone.now(),
                         },
                     )
+                    review.status = "Submitted"
+                    review.submitted_at = timezone.now()
+                    review.hmrc_receipt_id = response_payload.get("formBundleNumber") or ""
+                    review.save(update_fields=["status", "submitted_at", "hmrc_receipt_id", "updated_at"])
                     messages.success(request, f"Submitted VAT period {period_key} to HMRC sandbox.")
                 except HmrcApiError as exc:
                     try:
@@ -332,6 +391,9 @@ def hmrc_vat_workspace(request):
                         )
                         connection.last_submission_response = {"existing_return": existing_return}
                         connection.save(update_fields=["last_submission_response", "updated_at"])
+                        review.status = "Submitted"
+                        review.submitted_at = timezone.now()
+                        review.save(update_fields=["status", "submitted_at", "updated_at"])
                     except HmrcApiError:
                         messages.error(request, f"HMRC VAT submission failed: {exc}")
             return redirect(f"{request.path}?company={selected_tenant.id}")
@@ -339,13 +401,15 @@ def hmrc_vat_workspace(request):
     if connection:
         obligations = connection.latest_obligations or []
         for obligation in obligations:
-            prepared = serialize_vat_return_9_box(
-                selected_tenant,
-                obligation["start"],
-                obligation["end"],
-            )
-            prepared["periodKey"] = obligation["periodKey"]
+            _, prepared = _ensure_vat_review_for_obligation(selected_tenant, obligation)
             prepared_returns[obligation["periodKey"]] = prepared
+        vat_reviews = {
+            review.period_key: review
+            for review in VatReview.objects.filter(
+                tenant=selected_tenant,
+                period_key__in=[item.get("periodKey") for item in obligations],
+            )
+        }
 
     return render(
         request,
@@ -357,6 +421,42 @@ def hmrc_vat_workspace(request):
             "connection": connection,
             "obligations": obligations,
             "prepared_returns": prepared_returns,
+            "vat_reviews": vat_reviews,
+        },
+    )
+
+
+@login_required(login_url="/login/")
+def client_vat_review(request):
+    tenants, selected_tenant = _selected_tenant(request)
+    reviews = []
+
+    if selected_tenant:
+        reviews = VatReview.objects.filter(tenant=selected_tenant).order_by("-end_date", "-id")
+
+    if request.method == "POST" and selected_tenant:
+        period_key = request.POST.get("period_key")
+        review = VatReview.objects.filter(tenant=selected_tenant, period_key=period_key).first()
+        if not review:
+            messages.error(request, "VAT review was not found for this client.")
+        elif not review.checklist_complete:
+            messages.error(request, "The accountant checklist must be complete before client approval.")
+        else:
+            review.client_approved = True
+            review.client_approved_at = timezone.now()
+            review.client_approved_by = request.user.get_username() or "client"
+            review.status = "ClientApproved"
+            review.save()
+            messages.success(request, f"VAT period {period_key} approved for filing.")
+        return redirect(f"{request.path}?company={selected_tenant.id}")
+
+    return render(
+        request,
+        "accounting/client_vat_review.html",
+        {
+            "tenants": tenants,
+            "selected_tenant": selected_tenant,
+            "reviews": reviews,
         },
     )
 

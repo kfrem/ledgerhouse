@@ -3,6 +3,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from accounting.views import (
     client_portal,
+    client_vat_review,
     download_management_report,
     hmrc_authorise,
     hmrc_callback,
@@ -13,6 +14,7 @@ from accounting.views import (
 
 urlpatterns = [
     path('', client_portal, name='client_portal'),
+    path('vat/review/', client_vat_review, name='client_vat_review'),
     path('practice/', practice_dashboard, name='practice_dashboard'),
     path(
         'reports/<uuid:tenant_id>/<str:file_format>/',

@@ -17,7 +17,7 @@ from accounting.mtd import (
     submit_vat_return_payload,
     to_hmrc_vat_return_payload,
 )
-from accounting.models import HmrcVatConnection, Tenant, VatReturn
+from accounting.models import HmrcVatConnection, Tenant, VatReturn, VatReview
 
 
 class HmrcSandboxIntegrationTests(TestCase):
@@ -27,6 +27,21 @@ class HmrcSandboxIntegrationTests(TestCase):
             password="admin2",
             is_staff=True,
         )
+
+    def _prepared_payload(self, period_key="18A2"):
+        return {
+            "periodKey": period_key,
+            "vatDueOnOutputs": 105.50,
+            "vatDueAcquisitions": 0.00,
+            "totalVatDue": 105.50,
+            "vatReclaimedCurrPeriod": 25.25,
+            "netVatDue": 80.25,
+            "totalValueSalesExVAT": 1000,
+            "totalValuePurchasesExVAT": 250,
+            "totalValueGoodsSuppliedExVAT": 0,
+            "totalValueGoodsAcquisitionsExVAT": 0,
+            "finalised": True,
+        }
 
     @override_settings(HMRC_CLIENT_ID="", HMRC_CLIENT_SECRET="")
     def test_status_reports_missing_secret_without_exposing_values(self):
@@ -242,6 +257,32 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertContains(response, "Token stored")
         self.assertContains(response, "123456789")
 
+    def test_vat_workspace_backfills_reviews_for_existing_synced_obligations(self):
+        tenant = Tenant.objects.create(name="Backfill Client Ltd")
+        HmrcVatConnection.objects.create(
+            tenant=tenant,
+            vrn="123456789",
+            status="Connected",
+            access_token="access-token",
+            latest_obligations=[
+                {
+                    "periodKey": "18A2",
+                    "start": "2017-04-01",
+                    "end": "2017-06-30",
+                    "due": "2017-08-07",
+                    "status": "O",
+                }
+            ],
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("hmrc_vat_workspace"), {"company": tenant.id})
+
+        self.assertEqual(response.status_code, 200)
+        review = VatReview.objects.get(tenant=tenant, period_key="18A2")
+        self.assertEqual(review.status, "Draft")
+        self.assertEqual(review.prepared_payload["periodKey"], "18A2")
+
     @override_settings(
         HMRC_CLIENT_ID="sandbox-client-id",
         HMRC_CLIENT_SECRET="sandbox-secret",
@@ -310,6 +351,128 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 302)
         connection = HmrcVatConnection.objects.get(tenant=tenant)
         self.assertEqual(connection.latest_obligations[0]["periodKey"], "18A2")
+        review = VatReview.objects.get(tenant=tenant, period_key="18A2")
+        self.assertEqual(review.status, "Draft")
+        self.assertEqual(review.prepared_payload["periodKey"], "18A2")
+
+    def test_vat_workspace_updates_practice_review_checklist(self):
+        tenant = Tenant.objects.create(name="Review Client Ltd")
+        VatReview.objects.create(
+            tenant=tenant,
+            period_key="18A2",
+            start_date="2017-04-01",
+            end_date="2017-06-30",
+            due_date="2017-08-07",
+            prepared_payload=self._prepared_payload(),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("hmrc_vat_workspace"),
+            {
+                "company": tenant.id,
+                "action": "update_review",
+                "period_key": "18A2",
+                "evidence_complete": "on",
+                "bank_reconciled": "on",
+                "vat_codes_reviewed": "on",
+                "exceptions_resolved": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        review = VatReview.objects.get(tenant=tenant, period_key="18A2")
+        self.assertTrue(review.checklist_complete)
+        self.assertEqual(review.status, "Ready")
+        self.assertEqual(review.practice_approved_by, "admin")
+
+    def test_client_vat_review_requires_completed_practice_checklist(self):
+        tenant = Tenant.objects.create(name="Client Approval Ltd")
+        VatReview.objects.create(
+            tenant=tenant,
+            period_key="18A2",
+            start_date="2017-04-01",
+            end_date="2017-06-30",
+            prepared_payload=self._prepared_payload(),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("client_vat_review"),
+            {"company": tenant.id, "period_key": "18A2"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        review = VatReview.objects.get(tenant=tenant, period_key="18A2")
+        self.assertFalse(review.client_approved)
+        self.assertEqual(review.status, "Draft")
+
+    def test_client_vat_review_approves_completed_review(self):
+        tenant = Tenant.objects.create(name="Client Approved Ltd")
+        VatReview.objects.create(
+            tenant=tenant,
+            period_key="18A2",
+            start_date="2017-04-01",
+            end_date="2017-06-30",
+            prepared_payload=self._prepared_payload(),
+            evidence_complete=True,
+            bank_reconciled=True,
+            vat_codes_reviewed=True,
+            exceptions_resolved=True,
+            status="Ready",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("client_vat_review"),
+            {"company": tenant.id, "period_key": "18A2"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        review = VatReview.objects.get(tenant=tenant, period_key="18A2")
+        self.assertTrue(review.client_approved)
+        self.assertEqual(review.status, "ClientApproved")
+        self.assertEqual(review.client_approved_by, "admin")
+
+    @patch("accounting.views.submit_vat_return_payload")
+    def test_vat_workspace_blocks_submission_until_review_is_approved(self, submit_payload):
+        tenant = Tenant.objects.create(name="Blocked Submit Ltd")
+        HmrcVatConnection.objects.create(
+            tenant=tenant,
+            vrn="123456789",
+            status="Connected",
+            access_token="access-token",
+            latest_obligations=[
+                {
+                    "periodKey": "18A2",
+                    "start": "2017-04-01",
+                    "end": "2017-06-30",
+                    "due": "2017-08-07",
+                    "status": "O",
+                }
+            ],
+        )
+        VatReview.objects.create(
+            tenant=tenant,
+            period_key="18A2",
+            start_date="2017-04-01",
+            end_date="2017-06-30",
+            prepared_payload=self._prepared_payload(),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("hmrc_vat_workspace"),
+            {
+                "company": tenant.id,
+                "action": "submit_return",
+                "period_key": "18A2",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        submit_payload.assert_not_called()
+        self.assertFalse(VatReturn.objects.filter(tenant=tenant, period_key="18A2").exists())
 
     @patch("accounting.views.submit_vat_return_payload")
     def test_vat_workspace_submits_open_obligation_and_records_vat_return(self, submit_payload):
@@ -329,6 +492,20 @@ class HmrcSandboxIntegrationTests(TestCase):
                 }
             ],
         )
+        VatReview.objects.create(
+            tenant=tenant,
+            period_key="18A2",
+            start_date="2017-04-01",
+            end_date="2017-06-30",
+            due_date="2017-08-07",
+            prepared_payload=self._prepared_payload(),
+            evidence_complete=True,
+            bank_reconciled=True,
+            vat_codes_reviewed=True,
+            exceptions_resolved=True,
+            client_approved=True,
+            status="ClientApproved",
+        )
         submit_payload.return_value = {"formBundleNumber": "FORM-123"}
         self.client.force_login(self.user)
 
@@ -345,3 +522,6 @@ class HmrcSandboxIntegrationTests(TestCase):
         vat_return = VatReturn.objects.get(tenant=tenant, period_key="18A2")
         self.assertEqual(vat_return.status, "Submitted")
         self.assertEqual(vat_return.hmrc_receipt_id, "FORM-123")
+        review = VatReview.objects.get(tenant=tenant, period_key="18A2")
+        self.assertEqual(review.status, "Submitted")
+        self.assertEqual(review.hmrc_receipt_id, "FORM-123")

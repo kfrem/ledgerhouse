@@ -696,6 +696,54 @@ input {
     margin-top: 14px;
 }
 
+.vat-review-checklist {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 14px;
+    border: 1px solid #e3eeea;
+    border-radius: 8px;
+    background: #f8fbfa;
+}
+
+.checklist-heading,
+.approval-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vat-review-checklist label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 34px;
+    color: var(--ink);
+    font-weight: 800;
+}
+
+.vat-review-checklist input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+
+.approval-strip {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.approval-strip span {
+    color: var(--muted);
+    font-weight: 850;
+}
+
+.client-approval {
+    margin-top: 14px;
+}
+
 .response-block {
     overflow: auto;
     padding: 14px;

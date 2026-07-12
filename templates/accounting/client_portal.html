@@ -20,9 +20,10 @@
         <nav class="nav-list">
             <a class="active" href="{% url 'client_portal' %}"><span>01</span> Home</a>
             <a href="#upload"><span>02</span> Upload files</a>
-            <a href="#requests"><span>03</span> Requests</a>
-            <a href="#reports"><span>04</span> Reports</a>
-            <a href="#support"><span>05</span> Ask accountant</a>
+            <a href="{% url 'client_vat_review' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}"><span>03</span> VAT approval</a>
+            <a href="#requests"><span>04</span> Requests</a>
+            <a href="#reports"><span>05</span> Reports</a>
+            <a href="#support"><span>06</span> Ask accountant</a>
         </nav>
 
         <section class="sidebar-panel">
@@ -86,7 +87,7 @@
             <article class="client-status-card attention">
                 <span>VAT estimate</span>
                 <strong>{{ vat_due }}</strong>
-                <small>Latest figures available to review</small>
+                <small><a class="text-link" href="{% url 'client_vat_review' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}">Review VAT approvals</a></small>
             </article>
         </section>
 
