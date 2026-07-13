@@ -21,7 +21,7 @@
             <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
             <a class="active" href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
             <a href="/admin/accounting/tenant/"><span>03</span> Clients</a>
-            <a href="/admin/accounting/journal/"><span>04</span> Ledger</a>
+            <a href="{% url 'practice_ledger_review' %}"><span>04</span> Ledger</a>
             <a href="{% url 'practice_banking_review' %}"><span>05</span> Banking</a>
             <a href="/admin/accounting/vatreturn/"><span>06</span> VAT</a>
         </nav>
@@ -54,7 +54,7 @@
                 <h2>{{ tenant_count }} clients under control</h2>
                 <p class="hero-text">Live ledger totals, compliance signals, bank matching and evidence readiness in one controlled finance workspace.</p>
                 <div class="hero-actions">
-                    <a class="solid-button" href="/admin/accounting/journal/">Review ledger</a>
+                    <a class="solid-button" href="{% url 'practice_ledger_review' %}">Review ledger</a>
                     <a class="ghost-button dark" href="{% url 'practice_banking_review' %}">Open banking</a>
                 </div>
             </div>
@@ -107,7 +107,7 @@
                 <strong>Portfolio records</strong>
                 <small>Manage entities, accounts and source activity.</small>
             </a>
-            <a class="module-tile ready" href="/admin/accounting/journal/">
+            <a class="module-tile ready" href="{% url 'practice_ledger_review' %}">
                 <span>Ledger</span>
                 <strong>Double-entry core</strong>
                 <small>Review postings, source types and audit trail.</small>
@@ -270,7 +270,7 @@
                         </div>
                         <div class="queue-list">
                             {% for journal in review_journals %}
-                            <a class="queue-item" href="/admin/accounting/journal/{{ journal.id }}/change/">
+                            <a class="queue-item" href="{% url 'practice_ledger_review' %}?company={{ journal.tenant.id }}&status=RequiresReview">
                                 <span>
                                     <strong>{{ journal.description }}</strong>
                                     <small>{{ journal.tenant.name }} | {{ journal.date }} | {{ journal.source_type }}</small>
@@ -311,7 +311,7 @@
                         <p class="eyebrow">Latest ledger activity</p>
                         <h2>Posting stream</h2>
                     </div>
-                    <a class="text-link" href="/admin/accounting/journal/">Review all</a>
+                    <a class="text-link" href="{% url 'practice_ledger_review' %}">Review all</a>
                 </div>
                 <div class="activity-table">
                     <div class="table-head">
@@ -321,7 +321,7 @@
                         <span>Status</span>
                     </div>
                     {% for journal in recent_journals %}
-                    <a class="table-row" href="/admin/accounting/journal/{{ journal.id }}/change/">
+                    <a class="table-row" href="{% url 'practice_ledger_review' %}?company={{ journal.tenant.id }}">
                         <span>{{ journal.date }}</span>
                         <strong>{{ journal.tenant.name }}</strong>
                         <span>{{ journal.source_type }}</span>

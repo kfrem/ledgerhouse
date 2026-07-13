@@ -398,6 +398,39 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert f"/practice/clients/{open_transaction.tenant.id}/" in body
         assert "/admin/accounting/banktransaction/" in body
 
+    def test_practice_can_review_filtered_ledger_in_app(self):
+        review_journal = Journal.objects.create(
+            tenant=self.tenant,
+            date="2026-07-09",
+            description="Accrual awaiting sign-off",
+            source_type="SupplierInvoice",
+            source_id="MJ-REVIEW",
+            created_by="Test",
+            status="RequiresReview",
+        )
+        Journal.objects.create(
+            tenant=self.tenant,
+            date="2026-07-09",
+            description="Posted receipt",
+            source_type="BankReceipt",
+            source_id="BR-POSTED",
+            created_by="Test",
+            status="Posted",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            f"/practice/ledger/?company={self.tenant.id}&status=RequiresReview"
+        )
+        body = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Ledger review" in body
+        assert "Accrual awaiting sign-off" in body
+        assert "Posted receipt" not in body
+        assert f"/practice/clients/{review_journal.tenant.id}/" in body
+        assert "/admin/accounting/journal/" in body
+
     def test_client_question_requires_subject_and_message(self):
         self.client.force_login(self.user)
 

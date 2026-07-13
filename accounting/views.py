@@ -351,6 +351,49 @@ def practice_banking_review(request):
 
 
 @login_required(login_url="/login/")
+def practice_ledger_review(request):
+    tenants = list(Tenant.objects.order_by("name"))
+    requested_tenant = request.GET.get("company")
+    selected_tenant = None
+    selected_status = request.GET.get("status") or ""
+
+    queryset = Journal.objects.select_related("tenant")
+    if requested_tenant:
+        selected_tenant = next(
+            (tenant for tenant in tenants if str(tenant.id) == requested_tenant),
+            None,
+        )
+        if selected_tenant:
+            queryset = queryset.filter(tenant=selected_tenant)
+    if selected_status:
+        queryset = queryset.filter(status=selected_status)
+
+    journals = list(queryset.order_by("-date", "-id")[:100])
+    status_counts = Journal.objects.values("status").annotate(total=Count("id"))
+    if selected_tenant:
+        status_counts = (
+            Journal.objects.filter(tenant=selected_tenant)
+            .values("status")
+            .annotate(total=Count("id"))
+        )
+    status_lookup = {row["status"]: row["total"] for row in status_counts}
+
+    return render(
+        request,
+        "accounting/practice_ledger_review.html",
+        {
+            "tenants": tenants,
+            "selected_tenant": selected_tenant,
+            "selected_status": selected_status,
+            "journals": journals,
+            "journal_count": len(journals),
+            "posted_count": status_lookup.get("Posted", 0),
+            "review_count": status_lookup.get("RequiresReview", 0),
+        },
+    )
+
+
+@login_required(login_url="/login/")
 def practice_dashboard(request):
     tenants = list(
         Tenant.objects.annotate(

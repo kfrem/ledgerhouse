@@ -185,7 +185,7 @@
                         </div>
                         <div class="queue-list">
                             {% for journal in review_journals %}
-                            <a class="queue-item" href="/admin/accounting/journal/{{ journal.id }}/change/">
+                            <a class="queue-item" href="{% url 'practice_ledger_review' %}?company={{ tenant.id }}&status=RequiresReview">
                                 <span>
                                     <strong>{{ journal.description }}</strong>
                                     <small>{{ journal.date }} | {{ journal.source_type }}</small>
@@ -231,7 +231,7 @@
                         <p class="eyebrow">Ledger stream</p>
                         <h2>Recent postings</h2>
                     </div>
-                    <a class="text-link" href="/admin/accounting/journal/">Open ledger</a>
+                    <a class="text-link" href="{% url 'practice_ledger_review' %}?company={{ tenant.id }}">Open ledger</a>
                 </div>
                 <div class="activity-table">
                     <div class="table-head">
@@ -241,7 +241,7 @@
                         <span>Status</span>
                     </div>
                     {% for journal in latest_journals %}
-                    <a class="table-row" href="/admin/accounting/journal/{{ journal.id }}/change/">
+                    <a class="table-row" href="{% url 'practice_ledger_review' %}?company={{ tenant.id }}">
                         <span>{{ journal.date }}</span>
                         <strong>{{ journal.source_type }}</strong>
                         <span>{{ journal.description }}</span>

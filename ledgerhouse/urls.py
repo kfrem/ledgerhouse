@@ -13,6 +13,7 @@ from accounting.views import (
     practice_banking_review,
     practice_client_detail,
     practice_dashboard,
+    practice_ledger_review,
 )
 
 urlpatterns = [
@@ -23,6 +24,11 @@ urlpatterns = [
         'practice/banking/',
         practice_banking_review,
         name='practice_banking_review',
+    ),
+    path(
+        'practice/ledger/',
+        practice_ledger_review,
+        name='practice_ledger_review',
     ),
     path(
         'practice/clients/<uuid:tenant_id>/',
