@@ -307,6 +307,50 @@ def practice_client_detail(request, tenant_id):
 
 
 @login_required(login_url="/login/")
+def practice_banking_review(request):
+    tenants = list(Tenant.objects.order_by("name"))
+    requested_tenant = request.GET.get("company")
+    selected_tenant = None
+
+    queryset = BankTransaction.objects.select_related("tenant", "imported_file")
+    if requested_tenant:
+        selected_tenant = next(
+            (tenant for tenant in tenants if str(tenant.id) == requested_tenant),
+            None,
+        )
+        if selected_tenant:
+            queryset = queryset.filter(tenant=selected_tenant)
+
+    reconciled_ids = BankReconciliation.objects.values("bank_transaction_id")
+    if selected_tenant:
+        reconciled_ids = BankReconciliation.objects.filter(
+            tenant=selected_tenant,
+        ).values("bank_transaction_id")
+
+    unmatched_bank_transactions = list(
+        queryset.exclude(id__in=reconciled_ids).order_by("-date", "-id")[:100]
+    )
+    unmatched_total = sum(
+        (transaction.amount for transaction in unmatched_bank_transactions),
+        Decimal("0"),
+    )
+    affected_clients = len({transaction.tenant_id for transaction in unmatched_bank_transactions})
+
+    return render(
+        request,
+        "accounting/practice_banking_review.html",
+        {
+            "tenants": tenants,
+            "selected_tenant": selected_tenant,
+            "unmatched_bank_transactions": unmatched_bank_transactions,
+            "unmatched_count": len(unmatched_bank_transactions),
+            "unmatched_total": _money(unmatched_total),
+            "affected_clients": affected_clients,
+        },
+    )
+
+
+@login_required(login_url="/login/")
 def practice_dashboard(request):
     tenants = list(
         Tenant.objects.annotate(

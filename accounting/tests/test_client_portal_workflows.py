@@ -10,6 +10,7 @@ from openpyxl import Workbook
 
 from accounting.intake import process_uploaded_file
 from accounting.models import (
+    BankReconciliation,
     BankTransaction,
     ClientRequest,
     EvidenceDocument,
@@ -342,6 +343,60 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert detail_response.status_code == 200
         assert "Resolve payroll question" in detail_body
         assert "Resolved" in detail_body
+
+    def test_practice_can_review_unmatched_bank_lines_in_app(self):
+        imported_file = ImportedFile.objects.create(
+            tenant=self.tenant,
+            filename="bank-review.csv",
+            raw_content=(
+                "Date,Amount,Reference,FITID\n"
+                "2026-07-08,-58.20,Unmatched software,FITID-BANK-OPEN\n"
+                "2026-07-08,1200.00,Matched receipt,FITID-BANK-MATCHED\n"
+            ),
+            file_hash="bank-review",
+        )
+        open_transaction = BankTransaction.objects.create(
+            tenant=self.tenant,
+            imported_file=imported_file,
+            date="2026-07-08",
+            amount=Decimal("-58.20"),
+            reference="Unmatched software",
+            fitid="FITID-BANK-OPEN",
+        )
+        matched_transaction = BankTransaction.objects.create(
+            tenant=self.tenant,
+            imported_file=imported_file,
+            date="2026-07-08",
+            amount=Decimal("1200.00"),
+            reference="Matched receipt",
+            fitid="FITID-BANK-MATCHED",
+        )
+        matched_journal = Journal.objects.create(
+            tenant=self.tenant,
+            date="2026-07-08",
+            description="Matched bank receipt",
+            source_type="BankReceipt",
+            source_id="BR-001",
+            created_by="Test",
+        )
+        BankReconciliation.objects.create(
+            tenant=self.tenant,
+            bank_transaction=matched_transaction,
+            matched_journal=matched_journal,
+            reconciled_by="Test",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"/practice/banking/?company={self.tenant.id}")
+        body = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Unmatched bank review" in body
+        assert "Unmatched software" in body
+        assert "GBP -58.20" in body
+        assert "Matched receipt" not in body
+        assert f"/practice/clients/{open_transaction.tenant.id}/" in body
+        assert "/admin/accounting/banktransaction/" in body
 
     def test_client_question_requires_subject_and_message(self):
         self.client.force_login(self.user)

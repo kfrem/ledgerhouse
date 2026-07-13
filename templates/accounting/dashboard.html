@@ -22,7 +22,7 @@
             <a class="active" href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
             <a href="/admin/accounting/tenant/"><span>03</span> Clients</a>
             <a href="/admin/accounting/journal/"><span>04</span> Ledger</a>
-            <a href="/admin/accounting/banktransaction/"><span>05</span> Banking</a>
+            <a href="{% url 'practice_banking_review' %}"><span>05</span> Banking</a>
             <a href="/admin/accounting/vatreturn/"><span>06</span> VAT</a>
         </nav>
 
@@ -55,7 +55,7 @@
                 <p class="hero-text">Live ledger totals, compliance signals, bank matching and evidence readiness in one controlled finance workspace.</p>
                 <div class="hero-actions">
                     <a class="solid-button" href="/admin/accounting/journal/">Review ledger</a>
-                    <a class="ghost-button dark" href="/admin/accounting/banktransaction/">Open banking</a>
+                    <a class="ghost-button dark" href="{% url 'practice_banking_review' %}">Open banking</a>
                 </div>
             </div>
             <div class="finance-visual" aria-label="Portfolio health visual">
@@ -112,7 +112,7 @@
                 <strong>Double-entry core</strong>
                 <small>Review postings, source types and audit trail.</small>
             </a>
-            <a class="module-tile" href="/admin/accounting/banktransaction/">
+            <a class="module-tile" href="{% url 'practice_banking_review' %}">
                 <span>Banking</span>
                 <strong>Matching queue</strong>
                 <small>Bank lines and reconciliation status.</small>
@@ -250,7 +250,7 @@
                         </div>
                         <div class="queue-list">
                             {% for transaction in unmatched_bank_transactions %}
-                            <a class="queue-item" href="/admin/accounting/banktransaction/{{ transaction.id }}/change/">
+                            <a class="queue-item" href="{% url 'practice_banking_review' %}?company={{ transaction.tenant.id }}">
                                 <span>
                                     <strong>{{ transaction.reference }}</strong>
                                     <small>{{ transaction.tenant.name }} | {{ transaction.date }} | {{ transaction.imported_file.filename }}</small>
