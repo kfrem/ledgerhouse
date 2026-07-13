@@ -1,0 +1,168 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Companies House</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Finaccord Pro</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
+            <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a href="{% url 'practice_clients' %}"><span>03</span> Clients</a>
+            <a class="active" href="{% url 'companies_house_workspace' %}"><span>04</span> Companies House</a>
+            <a href="{% url 'hmrc_vat_workspace' %}"><span>05</span> VAT</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Official register</p>
+            <strong>Public company data</strong>
+            <small>Company profile, due dates, registered office and SIC codes from Companies House.</small>
+        </section>
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Government integrations</p>
+                <h1>Companies House workspace</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'practice_clients' %}">Client records</a>
+                <form action="{% url 'logout' %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="solid-button">Sign out</button>
+                </form>
+            </div>
+        </header>
+
+        <section class="surface integration-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Connection status</p>
+                    <h2>Companies House public data API</h2>
+                </div>
+                {% if companies_house_status.configured %}
+                <span class="status-pill">API key ready</span>
+                {% else %}
+                <span class="status-pill warning">Needs API key</span>
+                {% endif %}
+            </div>
+
+            {% if messages %}
+            <div class="message-list">
+                {% for message in messages %}
+                <div class="message {{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="integration-grid">
+                <div>
+                    <span>API base URL</span>
+                    <strong>{{ companies_house_status.base_url }}</strong>
+                </div>
+                <div>
+                    <span>Credential source</span>
+                    <strong>{% if companies_house_status.key_source %}{{ companies_house_status.key_source }}{% else %}Missing{% endif %}</strong>
+                </div>
+                <div>
+                    <span>Local key file</span>
+                    <strong>{{ companies_house_status.local_key_file }}</strong>
+                </div>
+            </div>
+
+            <form class="vat-workspace-grid" method="get" action="{% url 'companies_house_workspace' %}">
+                <div class="vat-card">
+                    <label for="company_number">Company number</label>
+                    <input id="company_number" name="company_number" value="{{ company_number }}" placeholder="00000006">
+                    <small>Numeric entries are normalised to 8 digits.</small>
+                </div>
+                <div class="vat-card">
+                    <span>Lookup type</span>
+                    <strong>Company profile</strong>
+                    <small>Read-only public register data.</small>
+                </div>
+                <div class="vat-card">
+                    <span>Action</span>
+                    <button class="solid-button" type="submit">Lookup company</button>
+                </div>
+            </form>
+        </section>
+
+        {% if snapshot %}
+        <section class="surface integration-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Official profile</p>
+                    <h2>{{ snapshot.company_name }}</h2>
+                </div>
+                <span class="status-pill">{{ snapshot.company_status|title }}</span>
+            </div>
+
+            <div class="integration-grid">
+                <div>
+                    <span>Company number</span>
+                    <strong>{{ snapshot.company_number }}</strong>
+                </div>
+                <div>
+                    <span>Company type</span>
+                    <strong>{{ snapshot.company_type }}</strong>
+                </div>
+                <div>
+                    <span>Incorporated</span>
+                    <strong>{{ snapshot.incorporated_on|default:"Not provided" }}</strong>
+                </div>
+                <div>
+                    <span>Accounts next due</span>
+                    <strong>{{ snapshot.accounts_next_due|default:"Not provided" }}</strong>
+                </div>
+                <div>
+                    <span>Confirmation statement next due</span>
+                    <strong>{{ snapshot.confirmation_next_due|default:"Not provided" }}</strong>
+                </div>
+                <div>
+                    <span>SIC codes</span>
+                    <strong>{% if snapshot.sic_codes %}{{ snapshot.sic_codes|join:", " }}{% else %}Not provided{% endif %}</strong>
+                </div>
+            </div>
+
+            <div class="config-list">
+                <div class="config-item">
+                    <span>Registered office</span>
+                    <strong>{{ snapshot.registered_office|default:"Not provided" }}</strong>
+                </div>
+                <div class="config-item">
+                    <span>LedgerHouse client record</span>
+                    <strong>{% if linked_tenant %}Matched: {{ linked_tenant.name }}{% else %}Not yet created{% endif %}</strong>
+                </div>
+            </div>
+
+            <div class="hero-actions integration-actions">
+                {% if linked_tenant %}
+                <a class="solid-button" href="{% url 'practice_client_detail' linked_tenant.id %}">Open client file</a>
+                {% else %}
+                <form method="post" action="{% url 'companies_house_workspace' %}?company_number={{ company_number }}">
+                    {% csrf_token %}
+                    <input type="hidden" name="company_number" value="{{ company_number }}">
+                    <input type="hidden" name="action" value="create_client">
+                    <button class="solid-button" type="submit">Create client record</button>
+                </form>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>

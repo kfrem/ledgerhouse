@@ -186,3 +186,15 @@ HMRC_TOKEN_URL = os.environ.get(
     'HMRC_TOKEN_URL',
     f'{HMRC_API_BASE_URL}/oauth/token',
 )
+
+# Companies House public data API integration. The API key can be supplied by
+# environment variable in production or by a local-only file during development.
+COMPANIES_HOUSE_API_BASE_URL = os.environ.get(
+    'COMPANIES_HOUSE_API_BASE_URL',
+    'https://api.company-information.service.gov.uk',
+)
+COMPANIES_HOUSE_API_KEY = os.environ.get('COMPANIES_HOUSE_API_KEY', '')
+COMPANIES_HOUSE_API_KEY_FILE = os.environ.get(
+    'COMPANIES_HOUSE_API_KEY_FILE',
+    str(Path.home() / '.companies_house_api_key'),
+)

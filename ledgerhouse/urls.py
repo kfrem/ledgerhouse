@@ -4,6 +4,7 @@ from django.urls import path
 from accounting.views import (
     client_portal,
     client_vat_review,
+    companies_house_workspace,
     download_management_report,
     hmrc_authorise,
     hmrc_callback,
@@ -66,6 +67,11 @@ urlpatterns = [
         'integrations/hmrc/vat/',
         hmrc_vat_workspace,
         name='hmrc_vat_workspace',
+    ),
+    path(
+        'integrations/companies-house/',
+        companies_house_workspace,
+        name='companies_house_workspace',
     ),
     path(
         'api/integrations/hmrc/authorise/',

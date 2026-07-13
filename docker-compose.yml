@@ -41,6 +41,8 @@ services:
       - HMRC_REDIRECT_URI=${HMRC_REDIRECT_URI:-http://localhost:8000/api/integrations/hmrc/callback}
       - HMRC_SCOPES=${HMRC_SCOPES:-read:vat write:vat}
       - HMRC_API_BASE_URL=${HMRC_API_BASE_URL:-https://test-api.service.hmrc.gov.uk}
+      - COMPANIES_HOUSE_API_KEY=${COMPANIES_HOUSE_API_KEY:-}
+      - COMPANIES_HOUSE_API_BASE_URL=${COMPANIES_HOUSE_API_BASE_URL:-https://api.company-information.service.gov.uk}
     depends_on:
       db:
         condition: service_healthy

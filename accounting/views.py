@@ -10,6 +10,12 @@ from django.db.models import Count, Max, Q, Sum
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from .companies_house import (
+    CompaniesHouseApiError,
+    companies_house_status,
+    company_profile_snapshot,
+    retrieve_company_profile,
+)
 from .intake import process_uploaded_file
 from .mtd import (
     HmrcApiError,
@@ -838,6 +844,63 @@ def hmrc_sandbox_status_view(request):
             "hmrc_status": hmrc_sandbox_status(),
             "tenants": tenants,
             "selected_tenant": selected_tenant,
+        },
+    )
+
+
+@login_required(login_url="/login/")
+def companies_house_workspace(request):
+    status = companies_house_status()
+    company_number = (request.GET.get("company_number") or request.POST.get("company_number") or "").strip()
+    profile = None
+    snapshot = None
+    linked_tenant = None
+
+    if company_number:
+        try:
+            profile = retrieve_company_profile(company_number)
+            snapshot = company_profile_snapshot(profile)
+            linked_tenant = Tenant.objects.filter(name__iexact=snapshot["company_name"]).first()
+        except ValueError as exc:
+            messages.error(request, str(exc))
+        except CompaniesHouseApiError as exc:
+            if exc.status_code == 404:
+                messages.error(request, "Companies House could not find that company number.")
+            else:
+                messages.error(request, f"Companies House lookup failed: {exc}")
+
+    if request.method == "POST" and request.POST.get("action") == "create_client":
+        if not snapshot:
+            messages.error(request, "Lookup the company before creating a client record.")
+        else:
+            tenant, created = Tenant.objects.get_or_create(name=snapshot["company_name"])
+            _ensure_default_nominals(tenant)
+            _record_audit_event(
+                tenant,
+                "CompaniesHouseSync",
+                request.user.get_username(),
+                f"Companies House profile {'created' if created else 'matched'} for {snapshot['company_number']}.",
+                {
+                    "company_number": snapshot["company_number"],
+                    "company_status": snapshot["company_status"],
+                    "accounts_next_due": snapshot["accounts_next_due"],
+                    "confirmation_next_due": snapshot["confirmation_next_due"],
+                },
+            )
+            messages.success(
+                request,
+                f"{'Created' if created else 'Matched'} LedgerHouse client record for {tenant.name}.",
+            )
+            return redirect("practice_client_detail", tenant_id=tenant.id)
+
+    return render(
+        request,
+        "accounting/companies_house_workspace.html",
+        {
+            "companies_house_status": status,
+            "company_number": company_number,
+            "snapshot": snapshot,
+            "linked_tenant": linked_tenant,
         },
     )
 
