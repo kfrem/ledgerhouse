@@ -1,6 +1,6 @@
 :root {
     --ink: #162126;
-    --muted: #69747b;
+    --muted: #4f5f66;
     --line: #dce6e4;
     --paper: #f5f8f7;
     --panel: #ffffff;
@@ -34,6 +34,15 @@ a {
     text-decoration: none;
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 3px solid #f2c66f;
+    outline-offset: 3px;
+}
+
 button,
 input {
     font: inherit;
@@ -56,6 +65,11 @@ select {
         linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 38%),
         var(--nav);
     color: #f9fbfb;
+}
+
+.sidebar .brand strong,
+.sidebar-panel strong {
+    color: #ffffff;
 }
 
 .brand {
@@ -84,7 +98,7 @@ select {
 
 .brand small {
     margin-top: 2px;
-    color: #aebfc3;
+    color: #d7e4e6;
 }
 
 .nav-list {
@@ -99,11 +113,11 @@ select {
     min-height: 44px;
     padding: 0 14px;
     border-radius: 8px;
-    color: #c6d3d6;
+    color: #eef6f7;
 }
 
 .nav-list span {
-    color: #78969d;
+    color: #b8cbd0;
     font-size: 0.75rem;
     font-weight: 800;
 }
@@ -133,7 +147,7 @@ select {
 }
 
 .sidebar-panel p {
-    color: #8cc4b8;
+    color: #b7e3da;
 }
 
 .sidebar-panel strong,
@@ -143,8 +157,18 @@ select {
 
 .sidebar-panel small {
     margin-top: 8px;
-    color: #b8c8cb;
+    color: #d7e4e6;
     line-height: 1.45;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 .workspace {
@@ -243,7 +267,7 @@ select {
 }
 
 .hero-copy .eyebrow {
-    color: #9fd8cc;
+    color: #c7eee7;
 }
 
 .hero-copy h2 {
@@ -255,7 +279,7 @@ select {
 .hero-text {
     max-width: 590px;
     margin: 18px 0 24px;
-    color: #d2e4e1;
+    color: #eef8f6;
     font-size: 1.04rem;
     line-height: 1.65;
 }
@@ -318,6 +342,30 @@ select {
     width: 34px;
     border-radius: 8px 8px 2px 2px;
     background: linear-gradient(180deg, #f2c66f, #0b7a65);
+}
+
+.bar-height-46 {
+    height: 46%;
+}
+
+.bar-height-54 {
+    height: 54%;
+}
+
+.bar-height-64 {
+    height: 64%;
+}
+
+.bar-height-72 {
+    height: 72%;
+}
+
+.bar-height-78 {
+    height: 78%;
+}
+
+.bar-height-88 {
+    height: 88%;
 }
 
 .summary-grid,
@@ -984,7 +1032,7 @@ select {
 }
 
 .client-hero .eyebrow {
-    color: #a8ddd3;
+    color: #d3f2ec;
 }
 
 .client-hero h2 {
@@ -997,7 +1045,7 @@ select {
 
 .client-hero p {
     max-width: 690px;
-    color: #d8ebe7;
+    color: #f2fbf9;
     font-size: 1.05rem;
     line-height: 1.65;
 }
@@ -1013,7 +1061,7 @@ select {
 }
 
 .company-switcher label {
-    color: #d8ebe7;
+    color: #f2fbf9;
     font-weight: 850;
 }
 
@@ -1029,7 +1077,7 @@ select {
 }
 
 .company-switcher small {
-    color: #c7ddd9;
+    color: #edf8f6;
     line-height: 1.45;
 }
 
@@ -1439,7 +1487,7 @@ select {
 }
 
 .support-panel p {
-    color: #d9e8e7;
+    color: #f2fbf9;
     line-height: 1.6;
 }
 
@@ -1455,7 +1503,7 @@ select {
 }
 
 .support-form label {
-    color: #d9e8e7;
+    color: #f2fbf9;
     font-weight: 850;
 }
 

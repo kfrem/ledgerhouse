@@ -77,6 +77,34 @@ class Phase2And3Tests(TestCase):
             # Confirm bank transactions created
             self.assertEqual(BankTransaction.objects.filter(tenant=self.tenant_a).count(), 2)
 
+    def test_bank_consent_token_is_encrypted_in_database_storage(self):
+        with tenant_context(self.tenant_a.id):
+            connection_a = BankFeedConnection.objects.create(
+                tenant=self.tenant_a,
+                bank_name="Barclays Business",
+                account_identifier="BARC-991-A",
+                status="Connected",
+                expires_at=timezone.now() + timedelta(days=90),
+                consent_token="bank-consent-token",
+            )
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT consent_token
+                    FROM accounting_bankfeedconnection
+                    WHERE id = %s
+                    """,
+                    [connection_a.id],
+                )
+                (raw_consent_token,) = cursor.fetchone()
+
+            self.assertTrue(raw_consent_token.startswith("enc:"))
+            self.assertNotIn("bank-consent-token", raw_consent_token)
+
+            connection_a.refresh_from_db()
+            self.assertEqual(connection_a.consent_token, "bank-consent-token")
+
     def test_open_banking_tenant_isolation_rls(self):
         """Verify cross-tenant Open Banking operations fail under RLS constraints."""
         if not self.is_postgres:

@@ -33,6 +33,7 @@ if not SECRET_KEY:
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
 
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+CSRF_COOKIE_HTTPONLY = True
 
 # Application definition
 
@@ -54,6 +55,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'accounting.security.SecurityHeadersMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -186,6 +188,13 @@ HMRC_TOKEN_URL = os.environ.get(
     'HMRC_TOKEN_URL',
     f'{HMRC_API_BASE_URL}/oauth/token',
 )
+HMRC_VENDOR_PUBLIC_IP = os.environ.get('HMRC_VENDOR_PUBLIC_IP', '127.0.0.1')
+HMRC_VENDOR_VERSION = os.environ.get('HMRC_VENDOR_VERSION', 'LedgerHouse=local')
+
+# Reversible field encryption for stored third-party tokens. In production this
+# must be a Fernet key generated with:
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
 
 # Companies House public data API integration. The API key can be supplied by
 # environment variable in production or by a local-only file during development.

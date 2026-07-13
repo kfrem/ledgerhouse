@@ -1,0 +1,31 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Privacy notice | LedgerHouse</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body class="login-page">
+    <main class="login-shell policy-shell">
+        <section class="login-card policy-card">
+            <a class="brand login-brand" href="/">
+                <span class="brand-mark">LH</span>
+                <span>
+                    <strong>LedgerHouse</strong>
+                    <small>Finaccord Pro</small>
+                </span>
+            </a>
+            <p class="eyebrow">Privacy notice</p>
+            <h1>How LedgerHouse handles customer data</h1>
+            <p>LedgerHouse processes accounting, bookkeeping, tax, client-support and management-reporting data for businesses and their advisers.</p>
+            <p>Data may include company details, user details, uploaded invoices, receipts, bank files, accounting journals, VAT records, HMRC authorisation tokens and audit records.</p>
+            <p>Data is used to provide the service, support client accounting workflows, prepare reports and interact with HMRC only where authorised by the customer.</p>
+            <p>HMRC access uses OAuth authorisation. LedgerHouse does not store customers' HMRC sign-in passwords. Stored HMRC tokens are encrypted at application level.</p>
+            <p>Customer data is protected by authentication, tenant access controls, audit records, security headers and production HTTPS. Customers can request export, correction or deletion where legally applicable.</p>
+            <p>Contact: <a href="mailto:info@kafs-ltd.com">info@kafs-ltd.com</a></p>
+        </section>
+    </main>
+</body>
+</html>

@@ -59,11 +59,12 @@
             </div>
             <form class="company-switcher" method="get">
                 <label for="company">Viewing company</label>
-                <select id="company" name="company" onchange="this.form.submit()">
+                <select id="company" name="company">
                     {% for tenant in tenants %}
                     <option value="{{ tenant.id }}" {% if tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
                     {% endfor %}
                 </select>
+                <button class="visually-hidden" type="submit">Change company</button>
                 <small>Demo selector for reviewing the seeded client records.</small>
             </form>
         </section>
@@ -113,7 +114,8 @@
                     <input type="hidden" name="company" value="{{ selected_tenant.id }}">
                     <strong>Drop receipts, invoices, photos, PDFs or spreadsheets here</strong>
                     <span>CSV and XLSX bank files are imported into banking. PDFs, photos and other files are stored in the evidence vault.</span>
-                    <input class="file-input" type="file" name="documents" multiple>
+                    <label class="visually-hidden" for="documents">Choose finance documents to upload</label>
+                    <input id="documents" class="file-input" type="file" name="documents" multiple>
                     <button class="solid-button" type="submit">Upload selected files</button>
                 </form>
                 <div class="upload-types">
@@ -239,6 +241,7 @@
                             <a href="{% url 'management_report' selected_tenant.id %}">View</a>
                             <a href="{% url 'download_management_report' selected_tenant.id 'csv' %}">CSV</a>
                             <a href="{% url 'download_management_report' selected_tenant.id 'pdf' %}">PDF</a>
+                            <a href="{% url 'download_management_report' selected_tenant.id 'zip' %}">Data export</a>
                         </span>
                         {% else %}
                         <em>Draft</em>

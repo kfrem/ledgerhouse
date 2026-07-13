@@ -17,10 +17,14 @@ from accounting.views import (
     practice_dashboard,
     practice_evidence_review,
     practice_ledger_review,
+    privacy_notice,
+    terms_and_conditions,
 )
 
 urlpatterns = [
     path('', client_portal, name='client_portal'),
+    path('privacy/', privacy_notice, name='privacy_notice'),
+    path('terms/', terms_and_conditions, name='terms_and_conditions'),
     path('vat/review/', client_vat_review, name='client_vat_review'),
     path('practice/', practice_dashboard, name='practice_dashboard'),
     path(

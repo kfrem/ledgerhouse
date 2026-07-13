@@ -1,5 +1,6 @@
 import csv
 import io
+import zipfile
 from decimal import Decimal
 
 from django.db.models import Q, Sum
@@ -8,7 +9,17 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from .models import BankReconciliation, BankTransaction, EvidenceDocument, Journal, JournalLine, VatReturn
+from .models import (
+    BankReconciliation,
+    BankTransaction,
+    ClientRequest,
+    EvidenceDocument,
+    ImportedFile,
+    Journal,
+    JournalLine,
+    NominalAccount,
+    VatReturn,
+)
 
 
 def _sum_lines(tenant, categories, side):
@@ -98,4 +109,166 @@ def management_report_pdf(tenant):
     )
     story.append(table)
     doc.build(story)
+    return buffer.getvalue()
+
+
+def _csv_bytes(headers, rows):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(headers)
+    writer.writerows(rows)
+    return output.getvalue().encode("utf-8")
+
+
+def client_data_export_zip(tenant):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as export:
+        export.writestr(
+            "README.txt",
+            (
+                "LedgerHouse client data export\n"
+                f"Company: {tenant.name}\n"
+                "This package contains accounting records, source file indexes, "
+                "client questions, VAT records and uploaded evidence files for "
+                "provider switching or client archive purposes.\n"
+            ),
+        )
+        export.writestr(
+            "nominal_accounts.csv",
+            _csv_bytes(
+                ["id", "code", "name", "category", "canonical_taxonomy"],
+                NominalAccount.objects.filter(tenant=tenant)
+                .order_by("code")
+                .values_list("id", "code", "name", "category", "canonical_taxonomy"),
+            ),
+        )
+        export.writestr(
+            "journals.csv",
+            _csv_bytes(
+                ["id", "date", "source_type", "source_id", "status", "description", "created_by"],
+                Journal.objects.filter(tenant=tenant)
+                .order_by("date", "id")
+                .values_list("id", "date", "source_type", "source_id", "status", "description", "created_by"),
+            ),
+        )
+        export.writestr(
+            "journal_lines.csv",
+            _csv_bytes(
+                [
+                    "id",
+                    "journal_id",
+                    "account_code",
+                    "account_name",
+                    "debit",
+                    "credit",
+                    "vat_code",
+                    "vat_rate",
+                    "vat_amount",
+                    "department",
+                ],
+                JournalLine.objects.filter(tenant=tenant)
+                .select_related("account")
+                .order_by("journal_id", "id")
+                .values_list(
+                    "id",
+                    "journal_id",
+                    "account__code",
+                    "account__name",
+                    "debit",
+                    "credit",
+                    "vat_code",
+                    "vat_rate",
+                    "vat_amount",
+                    "department",
+                ),
+            ),
+        )
+        export.writestr(
+            "imported_files.csv",
+            _csv_bytes(
+                ["id", "filename", "uploaded_at", "file_hash"],
+                ImportedFile.objects.filter(tenant=tenant)
+                .order_by("uploaded_at", "id")
+                .values_list("id", "filename", "uploaded_at", "file_hash"),
+            ),
+        )
+        export.writestr(
+            "bank_transactions.csv",
+            _csv_bytes(
+                ["id", "imported_file_id", "date", "amount", "reference", "fitid", "review_status", "reviewed_by"],
+                BankTransaction.objects.filter(tenant=tenant)
+                .order_by("date", "id")
+                .values_list("id", "imported_file_id", "date", "amount", "reference", "fitid", "review_status", "reviewed_by"),
+            ),
+        )
+        export.writestr(
+            "vat_returns.csv",
+            _csv_bytes(
+                [
+                    "id",
+                    "start_date",
+                    "end_date",
+                    "period_key",
+                    "status",
+                    "total_output_vat",
+                    "total_input_vat",
+                    "net_vat_payable",
+                    "hmrc_receipt_id",
+                ],
+                VatReturn.objects.filter(tenant=tenant)
+                .order_by("start_date", "id")
+                .values_list(
+                    "id",
+                    "start_date",
+                    "end_date",
+                    "period_key",
+                    "status",
+                    "total_output_vat",
+                    "total_input_vat",
+                    "net_vat_payable",
+                    "hmrc_receipt_id",
+                ),
+            ),
+        )
+        export.writestr(
+            "client_requests.csv",
+            _csv_bytes(
+                ["id", "subject", "category", "priority", "status", "submitted_by", "submitted_at", "resolved_by"],
+                ClientRequest.objects.filter(tenant=tenant)
+                .order_by("submitted_at", "id")
+                .values_list("id", "subject", "category", "priority", "status", "submitted_by", "submitted_at", "resolved_by"),
+            ),
+        )
+        evidence_rows = []
+        for document in EvidenceDocument.objects.filter(tenant=tenant).order_by("uploaded_at", "id"):
+            evidence_path = f"evidence/{document.id}-{document.filename}"
+            evidence_rows.append(
+                [
+                    document.id,
+                    document.filename,
+                    evidence_path,
+                    document.content_type,
+                    document.uploaded_at,
+                    document.uploaded_by,
+                    document.review_status,
+                    document.reviewed_by,
+                ]
+            )
+            export.writestr(evidence_path, bytes(document.file_content))
+        export.writestr(
+            "evidence_documents.csv",
+            _csv_bytes(
+                [
+                    "id",
+                    "filename",
+                    "export_path",
+                    "content_type",
+                    "uploaded_at",
+                    "uploaded_by",
+                    "review_status",
+                    "reviewed_by",
+                ],
+                evidence_rows,
+            ),
+        )
     return buffer.getvalue()

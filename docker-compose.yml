@@ -28,7 +28,7 @@ services:
     environment:
       - DEBUG=True
       - SECRET_KEY=django-insecure-stage-0-dummy-key-for-local-dev-only-do-not-use-in-prod
-      - ALLOWED_HOSTS=localhost,127.0.0.1,web
+      - ALLOWED_HOSTS=localhost,127.0.0.1,web,host.docker.internal
       - DATABASE_URL=postgres://ledgerhouse_user:ledgerhouse_secure_pass_123@db:5432/ledgerhouse_db
       - POSTGRES_DB=ledgerhouse_db
       - POSTGRES_USER=ledgerhouse_user

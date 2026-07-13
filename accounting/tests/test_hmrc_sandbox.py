@@ -4,18 +4,21 @@ import io
 import urllib.error
 
 from django.contrib.auth import get_user_model
+from django.db import connection as db_connection
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounting.mtd import (
     HmrcApiError,
     build_desktop_fraud_prevention_headers,
+    build_web_app_via_server_fraud_prevention_headers,
     build_hmrc_authorisation_url,
     hmrc_sandbox_status,
     retrieve_vat_obligations,
     retrieve_vat_return,
     submit_vat_return_payload,
     to_hmrc_vat_return_payload,
+    validate_fraud_prevention_headers,
 )
 from accounting.models import HmrcVatConnection, Tenant, VatReturn, VatReview
 
@@ -132,6 +135,44 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertEqual(headers["Gov-Client-Public-IP"], "203.0.113.10")
         self.assertIn("Gov-Vendor-Version", headers)
 
+    def test_web_app_via_server_fraud_prevention_headers_cover_hmrc_required_set(self):
+        headers = build_web_app_via_server_fraud_prevention_headers(
+            device_id="device-123",
+            public_ip="203.0.113.10",
+            public_port="54321",
+            browser_js_user_agent="Mozilla/5.0 Test",
+            screens="width=1920&height=1080&scaling-factor=1&colour-depth=24",
+            timezone="UTC+00:00",
+            user_id="admin",
+            window_size="width=1280&height=720",
+            vendor_public_ip="198.51.100.20",
+            vendor_version="LedgerHouse=local",
+        )
+
+        expected_headers = {
+            "Gov-Client-Connection-Method",
+            "Gov-Client-Browser-JS-User-Agent",
+            "Gov-Client-Device-ID",
+            "Gov-Client-Multi-Factor",
+            "Gov-Client-Public-IP",
+            "Gov-Client-Public-IP-Timestamp",
+            "Gov-Client-Public-Port",
+            "Gov-Client-Screens",
+            "Gov-Client-Timezone",
+            "Gov-Client-User-IDs",
+            "Gov-Client-Window-Size",
+            "Gov-Vendor-Forwarded",
+            "Gov-Vendor-License-IDs",
+            "Gov-Vendor-Product-Name",
+            "Gov-Vendor-Public-IP",
+            "Gov-Vendor-Version",
+        }
+        self.assertTrue(expected_headers.issubset(headers.keys()))
+        self.assertEqual(headers["Gov-Client-Connection-Method"], "WEB_APP_VIA_SERVER")
+        self.assertEqual(headers["Gov-Client-Public-IP"], "203.0.113.10")
+        self.assertEqual(headers["Gov-Client-Public-Port"], "54321")
+        self.assertIn("ledgerhouse=admin", headers["Gov-Client-User-IDs"])
+
     def test_vat_payload_mapper_uses_hmrc_field_names(self):
         payload = to_hmrc_vat_return_payload(
             {
@@ -174,6 +215,34 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertEqual(request.headers["Authorization"], "Bearer access-token")
         self.assertEqual(request.headers["Gov-client-device-id"], "device-123")
         self.assertEqual(obligations[0]["periodKey"], "18A2")
+
+    @override_settings(HMRC_API_BASE_URL="https://test-api.service.hmrc.gov.uk")
+    @patch("accounting.mtd.urllib.request.urlopen")
+    def test_validate_fraud_prevention_headers_calls_hmrc_validator(self, urlopen):
+        urlopen.return_value.__enter__.return_value.status = 200
+        urlopen.return_value.__enter__.return_value.read.return_value = (
+            b'{"specVersion":"3.1","code":"VALID_HEADERS","message":"All headers required for your connection method have been supplied and all appear to be valid."}'
+        )
+        fraud_headers = build_web_app_via_server_fraud_prevention_headers(
+            device_id="device-123",
+            public_ip="203.0.113.10",
+            public_port="54321",
+            browser_js_user_agent="Mozilla/5.0 Test",
+            screens="width=1920&height=1080&scaling-factor=1&colour-depth=24",
+            timezone="UTC+00:00",
+            user_id="admin",
+            window_size="width=1280&height=720",
+            vendor_public_ip="198.51.100.20",
+            vendor_version="LedgerHouse=local",
+        )
+
+        result = validate_fraud_prevention_headers("access-token", fraud_headers)
+
+        request = urlopen.call_args.args[0]
+        self.assertIn("/test/fraud-prevention-headers/validate", request.full_url)
+        self.assertEqual(request.headers["Authorization"], "Bearer access-token")
+        self.assertEqual(request.headers["Gov-client-connection-method"], "WEB_APP_VIA_SERVER")
+        self.assertEqual(result["code"], "VALID_HEADERS")
 
     @override_settings(HMRC_API_BASE_URL="https://test-api.service.hmrc.gov.uk")
     @patch("accounting.mtd.urllib.request.urlopen")
@@ -318,6 +387,36 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertEqual(connection.scope, "read:vat write:vat")
         self.assertTrue(connection.access_token)
 
+    def test_hmrc_tokens_are_encrypted_in_database_storage(self):
+        tenant = Tenant.objects.create(name="Encrypted Token Client Ltd")
+        connection = HmrcVatConnection.objects.create(
+            tenant=tenant,
+            vrn="123456789",
+            status="Connected",
+            access_token="access-token",
+            refresh_token="refresh-token",
+        )
+
+        with db_connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT access_token, refresh_token
+                FROM accounting_hmrcvatconnection
+                WHERE id = %s
+                """,
+                [connection.id],
+            )
+            raw_access_token, raw_refresh_token = cursor.fetchone()
+
+        self.assertTrue(raw_access_token.startswith("enc:"))
+        self.assertTrue(raw_refresh_token.startswith("enc:"))
+        self.assertNotIn("access-token", raw_access_token)
+        self.assertNotIn("refresh-token", raw_refresh_token)
+
+        connection.refresh_from_db()
+        self.assertEqual(connection.access_token, "access-token")
+        self.assertEqual(connection.refresh_token, "refresh-token")
+
     @patch("accounting.views.retrieve_vat_obligations")
     def test_vat_workspace_syncs_obligations(self, retrieve_obligations):
         tenant = Tenant.objects.create(name="Obligation Client Ltd")
@@ -345,10 +444,18 @@ class HmrcSandboxIntegrationTests(TestCase):
                 "action": "sync_obligations",
                 "from_date": "2026-01-01",
                 "to_date": "2026-12-31",
+                "fraud_device_id": "device-123",
+                "fraud_browser_js_user_agent": "Mozilla/5.0 Test",
+                "fraud_screens": "width=1920&height=1080&scaling-factor=1&colour-depth=24",
+                "fraud_timezone": "UTC+00:00",
+                "fraud_window_size": "width=1280&height=720",
             },
         )
 
         self.assertEqual(response.status_code, 302)
+        fraud_headers = retrieve_obligations.call_args.kwargs["fraud_headers"]
+        self.assertEqual(fraud_headers["Gov-Client-Connection-Method"], "WEB_APP_VIA_SERVER")
+        self.assertEqual(fraud_headers["Gov-Client-Device-ID"], "device-123")
         connection = HmrcVatConnection.objects.get(tenant=tenant)
         self.assertEqual(connection.latest_obligations[0]["periodKey"], "18A2")
         review = VatReview.objects.get(tenant=tenant, period_key="18A2")
@@ -515,10 +622,18 @@ class HmrcSandboxIntegrationTests(TestCase):
                 "company": tenant.id,
                 "action": "submit_return",
                 "period_key": "18A2",
+                "fraud_device_id": "device-123",
+                "fraud_browser_js_user_agent": "Mozilla/5.0 Test",
+                "fraud_screens": "width=1920&height=1080&scaling-factor=1&colour-depth=24",
+                "fraud_timezone": "UTC+00:00",
+                "fraud_window_size": "width=1280&height=720",
             },
         )
 
         self.assertEqual(response.status_code, 302)
+        fraud_headers = submit_payload.call_args.kwargs["fraud_headers"]
+        self.assertEqual(fraud_headers["Gov-Client-Connection-Method"], "WEB_APP_VIA_SERVER")
+        self.assertEqual(fraud_headers["Gov-Client-Device-ID"], "device-123")
         vat_return = VatReturn.objects.get(tenant=tenant, period_key="18A2")
         self.assertEqual(vat_return.status, "Submitted")
         self.assertEqual(vat_return.hmrc_receipt_id, "FORM-123")

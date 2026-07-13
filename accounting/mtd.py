@@ -1,5 +1,6 @@
 import uuid
 import json
+import hashlib
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -90,6 +91,32 @@ def exchange_hmrc_authorisation_code(code):
         return json.loads(response.read().decode("utf-8"))
 
 
+def exchange_hmrc_client_credentials_token():
+    if not settings.HMRC_CLIENT_ID:
+        raise ValueError("HMRC_CLIENT_ID is not configured.")
+    if not settings.HMRC_CLIENT_SECRET:
+        raise ValueError("HMRC_CLIENT_SECRET is not configured.")
+
+    body = urllib.parse.urlencode(
+        {
+            "grant_type": "client_credentials",
+            "client_id": settings.HMRC_CLIENT_ID,
+            "client_secret": settings.HMRC_CLIENT_SECRET,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        settings.HMRC_TOKEN_URL,
+        data=body,
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def build_desktop_fraud_prevention_headers(device_id, public_ip="127.0.0.1"):
     """
     Build baseline fraud prevention headers for local sandbox requests.
@@ -105,6 +132,59 @@ def build_desktop_fraud_prevention_headers(device_id, public_ip="127.0.0.1"):
         "Gov-Client-User-Agent": "LedgerHouse/local-sandbox",
         "Gov-Vendor-Version": "LedgerHouse=local",
     }
+
+
+def _percent_encode_header_value(value):
+    return urllib.parse.quote(str(value), safe="")
+
+
+def _hash_header_value(value):
+    return hashlib.sha256(str(value).encode("utf-8")).hexdigest().upper()
+
+
+def build_web_app_via_server_fraud_prevention_headers(
+    *,
+    device_id,
+    public_ip,
+    public_port,
+    browser_js_user_agent,
+    screens,
+    timezone,
+    user_id,
+    window_size,
+    vendor_public_ip,
+    vendor_version="LedgerHouse=local",
+):
+    now = timezone_now_millis()
+    encoded_user_id = _percent_encode_header_value(user_id or "anonymous")
+    return {
+        "Gov-Client-Connection-Method": "WEB_APP_VIA_SERVER",
+        "Gov-Client-Browser-JS-User-Agent": browser_js_user_agent or "unavailable",
+        "Gov-Client-Device-ID": device_id,
+        "Gov-Client-Multi-Factor": (
+            f"type=OTHER&timestamp={_percent_encode_header_value(now)}"
+            f"&unique-reference={_hash_header_value(user_id or device_id)}"
+        ),
+        "Gov-Client-Public-IP": public_ip,
+        "Gov-Client-Public-IP-Timestamp": now,
+        "Gov-Client-Public-Port": str(public_port or "0"),
+        "Gov-Client-Screens": screens or "width=1&height=1&scaling-factor=1&colour-depth=1",
+        "Gov-Client-Timezone": timezone or "UTC+00:00",
+        "Gov-Client-User-IDs": f"ledgerhouse={encoded_user_id}",
+        "Gov-Client-Window-Size": window_size or "width=1&height=1",
+        "Gov-Vendor-Forwarded": (
+            f"by={_percent_encode_header_value(vendor_public_ip)}"
+            f"&for={_percent_encode_header_value(public_ip)}"
+        ),
+        "Gov-Vendor-License-IDs": f"LedgerHouse={_hash_header_value('LedgerHouse SaaS')}",
+        "Gov-Vendor-Product-Name": "LedgerHouse",
+        "Gov-Vendor-Public-IP": vendor_public_ip,
+        "Gov-Vendor-Version": vendor_version,
+    }
+
+
+def timezone_now_millis():
+    return timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:23] + "Z"
 
 
 def _hmrc_json_request(url, access_token, method="GET", payload=None, headers=None):
@@ -141,35 +221,45 @@ def _hmrc_json_request(url, access_token, method="GET", payload=None, headers=No
         raise HmrcApiError(exc.code, message, error_payload) from exc
 
 
-def retrieve_vat_obligations(access_token, vrn, from_date, to_date, device_id, public_ip="127.0.0.1"):
+def retrieve_vat_obligations(access_token, vrn, from_date, to_date, device_id, public_ip="127.0.0.1", fraud_headers=None):
     params = urllib.parse.urlencode({"from": from_date, "to": to_date})
     url = f"{settings.HMRC_API_BASE_URL}/organisations/vat/{vrn}/obligations?{params}"
     response = _hmrc_json_request(
         url,
         access_token,
-        headers=build_desktop_fraud_prevention_headers(device_id, public_ip),
+        headers=fraud_headers or build_desktop_fraud_prevention_headers(device_id, public_ip),
     )
     return response["payload"].get("obligations", [])
 
 
-def retrieve_vat_return(access_token, vrn, period_key, device_id, public_ip="127.0.0.1"):
+def retrieve_vat_return(access_token, vrn, period_key, device_id, public_ip="127.0.0.1", fraud_headers=None):
     url = f"{settings.HMRC_API_BASE_URL}/organisations/vat/{vrn}/returns/{period_key}"
     response = _hmrc_json_request(
         url,
         access_token,
-        headers=build_desktop_fraud_prevention_headers(device_id, public_ip),
+        headers=fraud_headers or build_desktop_fraud_prevention_headers(device_id, public_ip),
     )
     return response["payload"]
 
 
-def submit_vat_return_payload(access_token, vrn, payload, device_id, public_ip="127.0.0.1"):
+def submit_vat_return_payload(access_token, vrn, payload, device_id, public_ip="127.0.0.1", fraud_headers=None):
     url = f"{settings.HMRC_API_BASE_URL}/organisations/vat/{vrn}/returns"
     response = _hmrc_json_request(
         url,
         access_token,
         method="POST",
         payload=payload,
-        headers=build_desktop_fraud_prevention_headers(device_id, public_ip),
+        headers=fraud_headers or build_desktop_fraud_prevention_headers(device_id, public_ip),
+    )
+    return response["payload"]
+
+
+def validate_fraud_prevention_headers(access_token, fraud_headers):
+    url = f"{settings.HMRC_API_BASE_URL}/test/fraud-prevention-headers/validate"
+    response = _hmrc_json_request(
+        url,
+        access_token,
+        headers=fraud_headers,
     )
     return response["payload"]
 

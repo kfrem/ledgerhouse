@@ -1,5 +1,6 @@
 from decimal import Decimal
 from io import BytesIO
+import zipfile
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -21,9 +22,10 @@ from accounting.models import (
     JournalLine,
     NominalAccount,
     Tenant,
+    TenantUserAccess,
     VatReturn,
 )
-from accounting.reports import management_report_csv, management_report_pdf
+from accounting.reports import client_data_export_zip, management_report_csv, management_report_pdf
 
 
 @pytest.mark.django_db(transaction=True)
@@ -99,6 +101,15 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Upload anything finance-related" in body
         assert "/admin/accounting" not in body
 
+    def test_public_privacy_and_terms_pages_render_without_login(self):
+        privacy_response = self.client.get("/privacy/")
+        terms_response = self.client.get("/terms/")
+
+        assert privacy_response.status_code == 200
+        assert terms_response.status_code == 200
+        assert "How LedgerHouse handles customer data" in privacy_response.content.decode()
+        assert "LedgerHouse service terms" in terms_response.content.decode()
+
     def test_practice_workspace_is_separate_from_client_portal(self):
         self.client.force_login(self.user)
         response = self.client.get("/practice/")
@@ -106,6 +117,63 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert response.status_code == 200
         assert "Portfolio command centre" in body
         assert "Practice" in body
+
+    def test_non_staff_client_cannot_access_practice_workspace(self):
+        client_user = get_user_model().objects.create_user(
+            username="client-user",
+            password="client-pass",
+            is_staff=False,
+        )
+        TenantUserAccess.objects.create(
+            tenant=self.tenant,
+            user=client_user,
+            role=TenantUserAccess.ROLE_CLIENT,
+        )
+        self.client.force_login(client_user)
+
+        response = self.client.get("/practice/")
+
+        assert response.status_code == 302
+        assert response["Location"].startswith("/login/")
+
+    def test_client_portal_limits_company_switching_to_assigned_tenants(self):
+        client_user = get_user_model().objects.create_user(
+            username="assigned-client",
+            password="client-pass",
+            is_staff=False,
+        )
+        other_tenant = Tenant.objects.create(name="Other Client Ltd")
+        TenantUserAccess.objects.create(
+            tenant=self.tenant,
+            user=client_user,
+            role=TenantUserAccess.ROLE_CLIENT,
+        )
+        self.client.force_login(client_user)
+
+        response = self.client.get(f"/?company={other_tenant.id}")
+        body = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Demo Client Ltd" in body
+        assert "Other Client Ltd" not in body
+
+    def test_client_cannot_download_unassigned_company_report(self):
+        client_user = get_user_model().objects.create_user(
+            username="report-client",
+            password="client-pass",
+            is_staff=False,
+        )
+        other_tenant = Tenant.objects.create(name="Unassigned Client Ltd")
+        TenantUserAccess.objects.create(
+            tenant=self.tenant,
+            user=client_user,
+            role=TenantUserAccess.ROLE_CLIENT,
+        )
+        self.client.force_login(client_user)
+
+        response = self.client.get(f"/reports/{other_tenant.id}/csv/")
+
+        assert response.status_code == 404
 
     def test_practice_can_create_client_in_app(self):
         self.client.force_login(self.user)
@@ -599,6 +667,13 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert ClientRequest.objects.filter(tenant=self.tenant).count() == 0
 
     def test_management_reports_generate_csv_and_pdf(self):
+        EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="switching-evidence.pdf",
+            file_content=b"%PDF-1.4\n% export receipt\n",
+            content_type="application/pdf",
+            uploaded_by="client",
+        )
         VatReturn.objects.create(
             tenant=self.tenant,
             start_date="2026-04-01",
@@ -613,18 +688,32 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         )
         csv_report = management_report_csv(self.tenant)
         pdf_report = management_report_pdf(self.tenant)
+        export_zip = client_data_export_zip(self.tenant)
 
         assert "Demo Client Ltd" in csv_report
         assert "Revenue" in csv_report
         assert pdf_report.startswith(b"%PDF")
+        with zipfile.ZipFile(BytesIO(export_zip)) as exported:
+            names = set(exported.namelist())
+            assert "README.txt" in names
+            assert "journals.csv" in names
+            assert "journal_lines.csv" in names
+            assert "bank_transactions.csv" in names
+            assert "vat_returns.csv" in names
+            assert "evidence_documents.csv" in names
+            assert any(name.endswith("-switching-evidence.pdf") for name in names)
+            assert "FORM-REPORT" in exported.read("vat_returns.csv").decode()
 
         self.client.force_login(self.user)
         csv_response = self.client.get(f"/reports/{self.tenant.id}/csv/")
         pdf_response = self.client.get(f"/reports/{self.tenant.id}/pdf/")
+        zip_response = self.client.get(f"/reports/{self.tenant.id}/zip/")
         assert csv_response.status_code == 200
         assert csv_response["Content-Type"] == "text/csv"
         assert pdf_response.status_code == 200
         assert pdf_response["Content-Type"] == "application/pdf"
+        assert zip_response.status_code == 200
+        assert zip_response["Content-Type"] == "application/zip"
 
     def test_client_can_view_management_report_in_app(self):
         EvidenceDocument.objects.create(
@@ -653,6 +742,7 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert portal_response.status_code == 200
         assert "Management report" in portal_body
         assert f"/reports/{self.tenant.id}/" in portal_body
+        assert f"/reports/{self.tenant.id}/zip/" in portal_body
         assert "Coming" not in portal_body
 
         report_response = self.client.get(f"/reports/{self.tenant.id}/")

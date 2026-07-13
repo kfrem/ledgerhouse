@@ -1,5 +1,8 @@
 import uuid
+from django.conf import settings
 from django.db import models
+
+from .crypto import EncryptedTextField
 
 
 class Tenant(models.Model):
@@ -9,6 +12,28 @@ class Tenant(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class TenantUserAccess(models.Model):
+    ROLE_CLIENT = "Client"
+    ROLE_PRACTICE = "Practice"
+    ROLE_CHOICES = [
+        (ROLE_CLIENT, "Client"),
+        (ROLE_PRACTICE, "Practice"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="user_access")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tenant_access")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CLIENT)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("tenant", "user")
+
+    def __str__(self):
+        return f"{self.user_id} -> {self.tenant_id} ({self.role})"
 
 
 class NominalAccount(models.Model):
@@ -211,8 +236,8 @@ class HmrcVatConnection(models.Model):
     tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name='hmrc_vat_connection')
     vrn = models.CharField(max_length=9, blank=True, default='')
     status = models.CharField(max_length=20, default='NotConnected')
-    access_token = models.TextField(blank=True, default='')
-    refresh_token = models.TextField(blank=True, default='')
+    access_token = EncryptedTextField(blank=True, default='')
+    refresh_token = EncryptedTextField(blank=True, default='')
     scope = models.CharField(max_length=120, blank=True, default='')
     token_expires_at = models.DateTimeField(null=True, blank=True)
     last_authorised_at = models.DateTimeField(null=True, blank=True)
@@ -299,7 +324,7 @@ class BankFeedConnection(models.Model):
     connected_at = models.DateTimeField(auto_now_add=True)
     last_sync_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField()
-    consent_token = models.TextField()
+    consent_token = EncryptedTextField()
 
     def __str__(self):
         return f"{self.bank_name} - {self.account_identifier} ({self.status}) for Tenant {self.tenant_id}"

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    Tenant, NominalAccount, AccountingPeriod, Journal, JournalLine,
+    Tenant, TenantUserAccess, NominalAccount, AccountingPeriod, Journal, JournalLine,
     AuditEvent, VatRate, VatDecisionRule, ImportedFile, BankTransaction,
     EvidenceDocument, JournalEvidenceLink, BankReconciliation, VatReturn,
     HmrcVatConnection, VatReview, ClientRequest, BankFeedConnection
@@ -14,6 +14,12 @@ admin.site.index_title = "Accounting control room"
 class TenantAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'created_at')
     search_fields = ('name',)
+
+@admin.register(TenantUserAccess)
+class TenantUserAccessAdmin(admin.ModelAdmin):
+    list_display = ('id', 'tenant', 'user', 'role', 'is_active', 'created_at')
+    list_filter = ('tenant', 'role', 'is_active')
+    search_fields = ('tenant__name', 'user__username', 'user__email')
 
 @admin.register(NominalAccount)
 class NominalAccountAdmin(admin.ModelAdmin):

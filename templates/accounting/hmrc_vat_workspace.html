@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | HMRC VAT workspace</title>
     <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <script defer src="{% static 'accounting/fraud_context.js' %}"></script>
 </head>
 <body>
     <aside class="sidebar" aria-label="Main navigation">
@@ -64,11 +65,12 @@
 
             <form class="company-switcher inline-switcher" method="get">
                 <label for="company">Client</label>
-                <select id="company" name="company" onchange="this.form.submit()">
+                <select id="company" name="company">
                     {% for tenant in tenants %}
                     <option value="{{ tenant.id }}" {% if selected_tenant and tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
                     {% endfor %}
                 </select>
+                <button class="visually-hidden" type="submit">Change client</button>
             </form>
 
             <div class="vat-workspace-grid">
@@ -99,10 +101,15 @@
                     {% endif %}
                 </div>
 
-                <form class="vat-card" method="post">
+                <form class="vat-card" method="post" data-fraud-context>
                     {% csrf_token %}
                     <input type="hidden" name="action" value="sync_obligations">
                     <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                    <input data-fraud-field type="hidden" name="fraud_device_id">
+                    <input data-fraud-field type="hidden" name="fraud_browser_js_user_agent">
+                    <input data-fraud-field type="hidden" name="fraud_screens">
+                    <input data-fraud-field type="hidden" name="fraud_timezone">
+                    <input data-fraud-field type="hidden" name="fraud_window_size">
                     <span>HMRC obligations</span>
                     <div class="date-pair">
                         <label for="from_date">From</label>
@@ -175,11 +182,16 @@
                         <button class="ghost-button" type="submit">Save checklist</button>
                     </form>
 
-                    <form method="post" class="vat-submit-row">
+                    <form method="post" class="vat-submit-row" data-fraud-context>
                         {% csrf_token %}
                         <input type="hidden" name="company" value="{{ selected_tenant.id }}">
                         <input type="hidden" name="action" value="submit_return">
                         <input type="hidden" name="period_key" value="{{ obligation.periodKey }}">
+                        <input data-fraud-field type="hidden" name="fraud_device_id">
+                        <input data-fraud-field type="hidden" name="fraud_browser_js_user_agent">
+                        <input data-fraud-field type="hidden" name="fraud_screens">
+                        <input data-fraud-field type="hidden" name="fraud_timezone">
+                        <input data-fraud-field type="hidden" name="fraud_window_size">
                         {% if obligation.status == "O" and review.ready_to_submit %}
                         <button class="solid-button" type="submit">Submit sandbox return</button>
                         {% elif obligation.status == "O" %}

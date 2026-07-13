@@ -2,8 +2,9 @@ from datetime import date, timedelta
 from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
+from django.conf import settings
 from django.http import Http404, HttpResponse
 from django.db import transaction
 from django.db.models import Count, Max, Q, Sum
@@ -19,6 +20,7 @@ from .companies_house import (
 from .intake import process_uploaded_file
 from .mtd import (
     HmrcApiError,
+    build_web_app_via_server_fraud_prevention_headers,
     build_hmrc_authorisation_url,
     exchange_hmrc_authorisation_code,
     hmrc_sandbox_status,
@@ -41,10 +43,16 @@ from .models import (
     JournalLine,
     NominalAccount,
     Tenant,
+    TenantUserAccess,
     VatReturn,
     VatReview,
 )
-from .reports import management_report_context, management_report_csv, management_report_pdf
+from .reports import (
+    client_data_export_zip,
+    management_report_context,
+    management_report_csv,
+    management_report_pdf,
+)
 
 
 def _money(value):
@@ -52,8 +60,24 @@ def _money(value):
     return f"GBP {value:,.2f}"
 
 
+def _is_practice_staff(user):
+    return user.is_authenticated and user.is_staff
+
+
+practice_staff_required = user_passes_test(_is_practice_staff, login_url="/login/")
+
+
+def _tenants_for_user(user):
+    if user.is_staff or user.is_superuser:
+        return Tenant.objects.order_by("name")
+    return Tenant.objects.filter(
+        user_access__user=user,
+        user_access__is_active=True,
+    ).distinct().order_by("name")
+
+
 def _selected_tenant(request):
-    tenants = list(Tenant.objects.order_by("name"))
+    tenants = list(_tenants_for_user(request.user))
     selected_tenant = None
     requested_tenant = request.GET.get("company") or request.POST.get("company")
 
@@ -65,6 +89,39 @@ def _selected_tenant(request):
     if selected_tenant is None and tenants:
         selected_tenant = tenants[0]
     return tenants, selected_tenant
+
+
+def _authorised_tenant_for_user(user, tenant_id):
+    tenant = _tenants_for_user(user).filter(id=tenant_id).first()
+    if not tenant:
+        raise Http404("Company not found")
+    return tenant
+
+
+def _request_public_ip(request):
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "127.0.0.1")
+
+
+def _hmrc_web_fraud_headers(request, tenant):
+    public_ip = _request_public_ip(request)
+    return build_web_app_via_server_fraud_prevention_headers(
+        device_id=request.POST.get("fraud_device_id") or f"ledgerhouse-{tenant.id}",
+        public_ip=public_ip,
+        public_port=request.META.get("REMOTE_PORT", "0"),
+        browser_js_user_agent=(
+            request.POST.get("fraud_browser_js_user_agent")
+            or request.META.get("HTTP_USER_AGENT", "")
+        ),
+        screens=request.POST.get("fraud_screens", ""),
+        timezone=request.POST.get("fraud_timezone", ""),
+        user_id=request.user.get_username() or str(request.user.id),
+        window_size=request.POST.get("fraud_window_size", ""),
+        vendor_public_ip=getattr(settings, "HMRC_VENDOR_PUBLIC_IP", "127.0.0.1"),
+        vendor_version=getattr(settings, "HMRC_VENDOR_VERSION", "LedgerHouse=local"),
+    )
 
 
 def _ensure_vat_review_for_obligation(tenant, obligation):
@@ -135,6 +192,14 @@ def _record_audit_event(tenant, event_type, username, description, details=None)
         description=description,
         details=details or {},
     )
+
+
+def privacy_notice(request):
+    return render(request, "accounting/privacy.html")
+
+
+def terms_and_conditions(request):
+    return render(request, "accounting/terms.html")
 
 
 def _create_evidence_review_journal(document, username):
@@ -367,10 +432,7 @@ def client_portal(request):
 
 @login_required(login_url="/login/")
 def management_report_view(request, tenant_id):
-    try:
-        tenant = Tenant.objects.get(id=tenant_id)
-    except Tenant.DoesNotExist as exc:
-        raise Http404("Company not found") from exc
+    tenant = _authorised_tenant_for_user(request.user, tenant_id)
 
     report = management_report_context(tenant)
     latest_journals = Journal.objects.filter(tenant=tenant).order_by("-date", "-id")[:8]
@@ -396,10 +458,7 @@ def management_report_view(request, tenant_id):
 
 @login_required(login_url="/login/")
 def download_management_report(request, tenant_id, file_format):
-    try:
-        tenant = Tenant.objects.get(id=tenant_id)
-    except Tenant.DoesNotExist as exc:
-        raise Http404("Company not found") from exc
+    tenant = _authorised_tenant_for_user(request.user, tenant_id)
 
     if file_format == "csv":
         response = HttpResponse(management_report_csv(tenant), content_type="text/csv")
@@ -409,10 +468,15 @@ def download_management_report(request, tenant_id, file_format):
         response = HttpResponse(management_report_pdf(tenant), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{tenant.name}-management-report.pdf"'
         return response
+    if file_format == "zip":
+        response = HttpResponse(client_data_export_zip(tenant), content_type="application/zip")
+        response["Content-Disposition"] = f'attachment; filename="{tenant.name}-data-export.zip"'
+        return response
     raise Http404("Report format not supported")
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def practice_clients(request):
     if request.method == "POST":
         action = request.POST.get("action")
@@ -454,6 +518,7 @@ def practice_clients(request):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def practice_client_detail(request, tenant_id):
     try:
         tenant = Tenant.objects.get(id=tenant_id)
@@ -518,6 +583,7 @@ def practice_client_detail(request, tenant_id):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def practice_banking_review(request):
     tenants = list(Tenant.objects.order_by("name"))
     requested_tenant = request.GET.get("company")
@@ -606,6 +672,7 @@ def practice_banking_review(request):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def practice_ledger_review(request):
     tenants = list(Tenant.objects.order_by("name"))
     requested_tenant = request.GET.get("company")
@@ -679,6 +746,7 @@ def practice_ledger_review(request):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def practice_evidence_review(request):
     tenants = list(Tenant.objects.order_by("name"))
     requested_tenant = request.GET.get("company")
@@ -760,6 +828,7 @@ def practice_evidence_review(request):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def practice_dashboard(request):
     tenants = list(
         Tenant.objects.annotate(
@@ -835,6 +904,7 @@ def practice_dashboard(request):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def hmrc_sandbox_status_view(request):
     tenants, selected_tenant = _selected_tenant(request)
     return render(
@@ -849,6 +919,7 @@ def hmrc_sandbox_status_view(request):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def companies_house_workspace(request):
     status = companies_house_status()
     company_number = (request.GET.get("company_number") or request.POST.get("company_number") or "").strip()
@@ -906,6 +977,7 @@ def companies_house_workspace(request):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def hmrc_vat_workspace(request):
     tenants, selected_tenant = _selected_tenant(request)
     connection = None
@@ -939,6 +1011,7 @@ def hmrc_vat_workspace(request):
                         request.POST.get("from_date") or "2026-01-01",
                         request.POST.get("to_date") or "2026-12-31",
                         f"ledgerhouse-{selected_tenant.id}",
+                        fraud_headers=_hmrc_web_fraud_headers(request, selected_tenant),
                     )
                     connection.latest_obligations = obligations
                     connection.last_obligations_sync_at = timezone.now()
@@ -1001,6 +1074,7 @@ def hmrc_vat_workspace(request):
                         connection.vrn,
                         hmrc_payload,
                         f"ledgerhouse-{selected_tenant.id}",
+                        fraud_headers=_hmrc_web_fraud_headers(request, selected_tenant),
                     )
                     connection.last_submission_response = response_payload
                     connection.save(update_fields=["last_submission_response", "updated_at"])
@@ -1031,6 +1105,7 @@ def hmrc_vat_workspace(request):
                             connection.vrn,
                             period_key,
                             f"ledgerhouse-{selected_tenant.id}",
+                            fraud_headers=_hmrc_web_fraud_headers(request, selected_tenant),
                         )
                         messages.error(
                             request,
@@ -1109,6 +1184,7 @@ def client_vat_review(request):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def hmrc_authorise(request):
     try:
         authorisation_url = build_hmrc_authorisation_url(
@@ -1121,6 +1197,7 @@ def hmrc_authorise(request):
 
 
 @login_required(login_url="/login/")
+@practice_staff_required
 def hmrc_callback(request):
     error = request.GET.get("error")
     if error:

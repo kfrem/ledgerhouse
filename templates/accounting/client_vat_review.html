@@ -57,11 +57,12 @@
             </div>
             <form class="company-switcher" method="get">
                 <label for="company">Company</label>
-                <select id="company" name="company" onchange="this.form.submit()">
+                <select id="company" name="company">
                     {% for tenant in tenants %}
                     <option value="{{ tenant.id }}" {% if selected_tenant and tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
                     {% endfor %}
                 </select>
+                <button class="visually-hidden" type="submit">Change company</button>
                 <small>The approval is recorded against this company file.</small>
             </form>
         </section>
