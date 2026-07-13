@@ -266,6 +266,24 @@ class VatReview(models.Model):
         return f"VAT review {self.period_key} for {self.tenant_id} ({self.status})"
 
 
+class ClientRequest(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='client_requests')
+    subject = models.CharField(max_length=160)
+    category = models.CharField(max_length=50, default='General')
+    message = models.TextField()
+    status = models.CharField(max_length=20, default='Open')  # Open, InProgress, Resolved
+    priority = models.CharField(max_length=20, default='Normal')  # Low, Normal, High
+    submitted_by = models.CharField(max_length=100)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.CharField(max_length=100, blank=True, default='')
+
+    def __str__(self):
+        return f"{self.tenant.name}: {self.subject} ({self.status})"
+
+
 class BankFeedConnection(models.Model):
     id = models.BigAutoField(primary_key=True)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)

@@ -282,6 +282,26 @@
                             {% endfor %}
                         </div>
                     </section>
+
+                    <section class="queue-panel">
+                        <div class="queue-heading">
+                            <span>04</span>
+                            <strong>Client questions</strong>
+                        </div>
+                        <div class="queue-list">
+                            {% for request_item in client_requests %}
+                            <a class="queue-item" href="/admin/accounting/clientrequest/{{ request_item.id }}/change/">
+                                <span>
+                                    <strong>{{ request_item.subject }}</strong>
+                                    <small>{{ request_item.tenant.name }} | {{ request_item.category }} | {{ request_item.submitted_at|date:"d M Y H:i" }}</small>
+                                </span>
+                                <em>{{ request_item.priority }}</em>
+                            </a>
+                            {% empty %}
+                            <div class="empty-state">No client questions are waiting.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
                 </div>
             </article>
 

@@ -25,6 +25,7 @@ from .mtd import (
 from .models import (
     BankReconciliation,
     BankTransaction,
+    ClientRequest,
     EvidenceDocument,
     HmrcVatConnection,
     Journal,
@@ -88,8 +89,28 @@ def client_portal(request):
 
     if request.method == "POST":
         if not selected_tenant:
-            messages.error(request, "No company is available for uploads.")
+            messages.error(request, "No company is available for this request.")
             return redirect("client_portal")
+        action = request.POST.get("action") or "upload_documents"
+        if action == "submit_client_request":
+            subject = (request.POST.get("subject") or "").strip()
+            category = (request.POST.get("category") or "General").strip()
+            priority = (request.POST.get("priority") or "Normal").strip()
+            message = (request.POST.get("message") or "").strip()
+            if not subject or not message:
+                messages.error(request, "Add a subject and message before sending your question.")
+            else:
+                ClientRequest.objects.create(
+                    tenant=selected_tenant,
+                    subject=subject[:160],
+                    category=category[:50] or "General",
+                    priority=priority[:20] or "Normal",
+                    message=message,
+                    submitted_by=request.user.get_username() or "client",
+                )
+                messages.success(request, "Your question has been sent to the accounts team.")
+            return redirect(f"{request.path}?company={selected_tenant.id}#support")
+
         uploaded_files = request.FILES.getlist("documents")
         if not uploaded_files:
             messages.error(request, "Choose at least one file to upload.")
@@ -116,6 +137,7 @@ def client_portal(request):
     latest_documents = []
     latest_journals = []
     vat_returns = []
+    client_requests = []
 
     if selected_tenant:
         revenue = JournalLine.objects.filter(
@@ -150,6 +172,9 @@ def client_portal(request):
         vat_returns = VatReturn.objects.filter(
             tenant=selected_tenant
         ).order_by("-end_date")[:3]
+        client_requests = ClientRequest.objects.filter(
+            tenant=selected_tenant
+        ).order_by("-submitted_at")[:4]
 
     context = {
         "tenants": tenants,
@@ -165,6 +190,7 @@ def client_portal(request):
         "latest_documents": latest_documents,
         "latest_journals": latest_journals,
         "vat_returns": vat_returns,
+        "client_requests": client_requests,
     }
     return render(request, "accounting/client_portal.html", context)
 
@@ -251,6 +277,11 @@ def practice_dashboard(request):
         .select_related("tenant")
         .order_by("-created_at")[:8]
     )
+    client_requests = (
+        ClientRequest.objects.exclude(status="Resolved")
+        .select_related("tenant")
+        .order_by("-submitted_at")[:8]
+    )
 
     context = {
         "tenants": tenants,
@@ -268,6 +299,7 @@ def practice_dashboard(request):
         "upload_inbox": upload_inbox,
         "unmatched_bank_transactions": unmatched_bank_transactions,
         "review_journals": review_journals,
+        "client_requests": client_requests,
         "hmrc_status": hmrc_sandbox_status(),
     }
     return render(request, "accounting/dashboard.html", context)

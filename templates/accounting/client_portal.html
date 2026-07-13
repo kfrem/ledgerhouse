@@ -109,6 +109,7 @@
                 {% endif %}
                 <form class="dropzone" method="post" enctype="multipart/form-data">
                     {% csrf_token %}
+                    <input type="hidden" name="action" value="upload_documents">
                     <input type="hidden" name="company" value="{{ selected_tenant.id }}">
                     <strong>Drop receipts, invoices, photos, PDFs or spreadsheets here</strong>
                     <span>CSV and XLSX bank files are imported into banking. PDFs, photos and other files are stored in the evidence vault.</span>
@@ -269,8 +270,43 @@
             <article id="support" class="client-panel support-panel">
                 <p class="eyebrow">Need advice?</p>
                 <h2>Ask your accountant</h2>
-                <p>Use this area to request help with cash flow, tax, payroll, pricing, funding, or management decisions.</p>
-                <button class="solid-button" type="button">Start a question</button>
+                <p>Send a question about cash flow, tax, payroll, pricing, funding, or management decisions. It appears in the practice workbench immediately.</p>
+                <form class="support-form" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="submit_client_request">
+                    <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                    <label for="request_subject">Subject</label>
+                    <input id="request_subject" name="subject" maxlength="160" placeholder="What do you need help with?">
+                    <label for="request_category">Category</label>
+                    <select id="request_category" name="category">
+                        <option>Cash flow</option>
+                        <option>Tax</option>
+                        <option>Payroll</option>
+                        <option>Pricing</option>
+                        <option>Funding</option>
+                        <option>Management decision</option>
+                        <option>General</option>
+                    </select>
+                    <label for="request_priority">Priority</label>
+                    <select id="request_priority" name="priority">
+                        <option>Normal</option>
+                        <option>High</option>
+                        <option>Low</option>
+                    </select>
+                    <label for="request_message">Message</label>
+                    <textarea id="request_message" name="message" rows="5" placeholder="Give the accounts team the context they need."></textarea>
+                    <button class="solid-button" type="submit">Send question</button>
+                </form>
+                <div class="support-history">
+                    {% for request_item in client_requests %}
+                    <div class="support-history-item">
+                        <strong>{{ request_item.subject }}</strong>
+                        <small>{{ request_item.category }} | {{ request_item.status }} | {{ request_item.submitted_at|date:"d M Y H:i" }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No advice requests have been sent yet.</div>
+                    {% endfor %}
+                </div>
             </article>
         </section>
     </main>

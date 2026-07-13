@@ -29,10 +29,11 @@ class Command(BaseCommand):
 
         # Clear existing data to allow clean re-runs
         self.stdout.write("Clearing existing accounting tables...")
-        from accounting.models import JournalLine, JournalEvidenceLink, EvidenceDocument, BankReconciliation, VatReturn
+        from accounting.models import JournalLine, JournalEvidenceLink, EvidenceDocument, BankReconciliation, VatReturn, ClientRequest
         BankReconciliation.objects.all().delete()
         JournalEvidenceLink.objects.all().delete()
         EvidenceDocument.objects.all().delete()
+        ClientRequest.objects.all().delete()
         BankTransaction.objects.all().delete()
         ImportedFile.objects.all().delete()
         JournalLine.objects.all().delete()

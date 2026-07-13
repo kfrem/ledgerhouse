@@ -3,7 +3,7 @@ from .models import (
     Tenant, NominalAccount, AccountingPeriod, Journal, JournalLine,
     AuditEvent, VatRate, VatDecisionRule, ImportedFile, BankTransaction,
     EvidenceDocument, JournalEvidenceLink, BankReconciliation, VatReturn,
-    HmrcVatConnection, VatReview, BankFeedConnection
+    HmrcVatConnection, VatReview, ClientRequest, BankFeedConnection
 )
 
 admin.site.site_header = "LedgerHouse Operations"
@@ -102,6 +102,13 @@ class VatReviewAdmin(admin.ModelAdmin):
     list_filter = ('tenant', 'status', 'client_approved')
     readonly_fields = ('created_at', 'updated_at')
     search_fields = ('tenant__name', 'period_key', 'hmrc_receipt_id')
+
+@admin.register(ClientRequest)
+class ClientRequestAdmin(admin.ModelAdmin):
+    list_display = ('id', 'tenant', 'subject', 'category', 'priority', 'status', 'submitted_by', 'submitted_at')
+    list_filter = ('tenant', 'category', 'priority', 'status')
+    readonly_fields = ('submitted_at', 'updated_at')
+    search_fields = ('tenant__name', 'subject', 'message', 'submitted_by')
 
 @admin.register(BankFeedConnection)
 class BankFeedConnectionAdmin(admin.ModelAdmin):

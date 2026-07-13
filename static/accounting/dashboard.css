@@ -39,6 +39,11 @@ input {
     font: inherit;
 }
 
+textarea,
+select {
+    font: inherit;
+}
+
 .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
@@ -1225,7 +1230,7 @@ input {
 
 .workbench-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
     margin-top: 18px;
 }
@@ -1416,6 +1421,56 @@ input {
 .support-panel .solid-button {
     background: #fff;
     color: var(--green-dark);
+}
+
+.support-form {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.support-form label {
+    color: #d9e8e7;
+    font-weight: 850;
+}
+
+.support-form input,
+.support-form select,
+.support-form textarea {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--ink);
+}
+
+.support-form textarea {
+    min-height: 126px;
+    resize: vertical;
+}
+
+.support-history {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.support-history-item {
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.support-history-item strong,
+.support-history-item small {
+    display: block;
+}
+
+.support-history-item small {
+    margin-top: 4px;
+    color: #d9e8e7;
 }
 
 @media (max-width: 1180px) {

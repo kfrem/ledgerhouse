@@ -11,6 +11,7 @@ from openpyxl import Workbook
 from accounting.intake import process_uploaded_file
 from accounting.models import (
     BankTransaction,
+    ClientRequest,
     EvidenceDocument,
     ImportedFile,
     Journal,
@@ -208,6 +209,59 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Parking" in body
         assert "Review before release" in body
         assert "Director card purchase" in body
+
+    def test_client_can_send_question_to_practice_workbench(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            "/",
+            {
+                "company": str(self.tenant.id),
+                "action": "submit_client_request",
+                "subject": "Can we review cash flow?",
+                "category": "Cash flow",
+                "priority": "High",
+                "message": "Please check whether we can afford a new hire next month.",
+            },
+        )
+
+        assert response.status_code == 302
+        request_item = ClientRequest.objects.get(tenant=self.tenant)
+        assert request_item.subject == "Can we review cash flow?"
+        assert request_item.category == "Cash flow"
+        assert request_item.priority == "High"
+        assert request_item.status == "Open"
+
+        portal_response = self.client.get(f"/?company={self.tenant.id}#support")
+        portal_body = portal_response.content.decode()
+        assert portal_response.status_code == 200
+        assert "Can we review cash flow?" in portal_body
+        assert "Cash flow | Open" in portal_body
+
+        practice_response = self.client.get("/practice/")
+        practice_body = practice_response.content.decode()
+        assert practice_response.status_code == 200
+        assert "Client questions" in practice_body
+        assert "Can we review cash flow?" in practice_body
+        assert "High" in practice_body
+
+    def test_client_question_requires_subject_and_message(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            "/",
+            {
+                "company": str(self.tenant.id),
+                "action": "submit_client_request",
+                "subject": "",
+                "category": "Tax",
+                "priority": "Normal",
+                "message": "",
+            },
+        )
+
+        assert response.status_code == 302
+        assert ClientRequest.objects.filter(tenant=self.tenant).count() == 0
 
     def test_management_reports_generate_csv_and_pdf(self):
         VatReturn.objects.create(
