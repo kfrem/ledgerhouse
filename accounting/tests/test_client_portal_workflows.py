@@ -198,6 +198,14 @@ class ClientPortalWorkflowTests(TransactionTestCase):
             created_by="Test",
             status="RequiresReview",
         )
+        ClientRequest.objects.create(
+            tenant=self.tenant,
+            subject="Open dashboard question",
+            category="Tax",
+            priority="Normal",
+            message="Please review this tax question.",
+            submitted_by="client",
+        )
 
         self.client.force_login(self.user)
         response = self.client.get("/practice/")
@@ -210,6 +218,9 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Review before release" in body
         assert "Director card purchase" in body
         assert f"/practice/clients/{self.tenant.id}/" in body
+        assert "Live controls" in body
+        assert "Client questions: 1 open" in body
+        assert "Next build" not in body
 
     def test_client_can_send_question_to_practice_workbench(self):
         self.client.force_login(self.user)

@@ -346,6 +346,15 @@ def practice_dashboard(request):
         .select_related("tenant")
         .order_by("-submitted_at")[:8]
     )
+    open_client_requests_count = ClientRequest.objects.exclude(status="Resolved").count()
+    awaiting_client_vat_count = VatReview.objects.filter(
+        status="Ready",
+        client_approved=False,
+    ).count()
+    ready_to_file_vat_count = VatReview.objects.filter(
+        client_approved=True,
+        status="ClientApproved",
+    ).count()
 
     context = {
         "tenants": tenants,
@@ -364,6 +373,9 @@ def practice_dashboard(request):
         "unmatched_bank_transactions": unmatched_bank_transactions,
         "review_journals": review_journals,
         "client_requests": client_requests,
+        "open_client_requests_count": open_client_requests_count,
+        "awaiting_client_vat_count": awaiting_client_vat_count,
+        "ready_to_file_vat_count": ready_to_file_vat_count,
         "hmrc_status": hmrc_sandbox_status(),
     }
     return render(request, "accounting/dashboard.html", context)

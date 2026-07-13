@@ -174,13 +174,13 @@
                 </article>
 
                 <article class="surface roadmap-card">
-                    <p class="eyebrow">Next build</p>
-                    <h2>Product workflows</h2>
+                    <p class="eyebrow">Live controls</p>
+                    <h2>Practice actions</h2>
                     <ul>
-                        <li>Client onboarding screens</li>
-                        <li>Invoice and receipt capture</li>
-                        <li>Bank feed matching review</li>
-                        <li>Management report pack</li>
+                        <li><a href="#workbench">Client questions: {{ open_client_requests_count }} open</a></li>
+                        <li><a href="{% url 'hmrc_vat_workspace' %}">VAT awaiting client approval: {{ awaiting_client_vat_count }}</a></li>
+                        <li><a href="{% url 'hmrc_vat_workspace' %}">VAT ready to file: {{ ready_to_file_vat_count }}</a></li>
+                        <li><a href="{% url 'client_portal' %}#reports">Management reports available in client portal</a></li>
                     </ul>
                 </article>
 
@@ -214,7 +214,7 @@
                 </article>
             </aside>
 
-            <article class="surface workbench-surface">
+            <article id="workbench" class="surface workbench-surface">
                 <div class="section-heading">
                     <div>
                         <p class="eyebrow">Practice workbench</p>
