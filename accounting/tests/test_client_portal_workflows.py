@@ -209,6 +209,7 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Parking" in body
         assert "Review before release" in body
         assert "Director card purchase" in body
+        assert f"/practice/clients/{self.tenant.id}/" in body
 
     def test_client_can_send_question_to_practice_workbench(self):
         self.client.force_login(self.user)
@@ -244,6 +245,60 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Client questions" in practice_body
         assert "Can we review cash flow?" in practice_body
         assert "High" in practice_body
+
+    def test_practice_can_open_in_app_client_file(self):
+        EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="client-file-receipt.pdf",
+            file_content=b"%PDF-1.4\n% client file receipt\n",
+            content_type="application/pdf",
+            uploaded_by="client",
+        )
+        ClientRequest.objects.create(
+            tenant=self.tenant,
+            subject="Need pricing advice",
+            category="Pricing",
+            priority="Normal",
+            message="Please review our pricing before the next quote.",
+            submitted_by="client",
+        )
+        imported_file = ImportedFile.objects.create(
+            tenant=self.tenant,
+            filename="client-file-bank.csv",
+            raw_content="Date,Amount,Reference,FITID\n2026-07-05,-31.00,Stationery,FITID-CLIENT-FILE\n",
+            file_hash="client-file-bank",
+        )
+        BankTransaction.objects.create(
+            tenant=self.tenant,
+            imported_file=imported_file,
+            date="2026-07-05",
+            amount=Decimal("-31.00"),
+            reference="Stationery",
+            fitid="FITID-CLIENT-FILE",
+        )
+        Journal.objects.create(
+            tenant=self.tenant,
+            date="2026-07-05",
+            description="Quote review accrual",
+            source_type="ManualJournal",
+            source_id="MJ-CLIENT-FILE",
+            created_by="Test",
+            status="RequiresReview",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"/practice/clients/{self.tenant.id}/")
+        body = response.content.decode()
+
+        assert response.status_code == 200
+        assert "LedgerHouse | Client file" in body
+        assert "Demo Client Ltd" in body
+        assert "Need pricing advice" in body
+        assert "client-file-receipt.pdf" in body
+        assert "Stationery" in body
+        assert "Quote review accrual" in body
+        assert f"/reports/{self.tenant.id}/" in body
+        assert f"/integrations/hmrc/vat/?company={self.tenant.id}" in body
 
     def test_client_question_requires_subject_and_message(self):
         self.client.force_login(self.user)

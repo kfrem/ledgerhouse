@@ -243,6 +243,47 @@ def download_management_report(request, tenant_id, file_format):
 
 
 @login_required(login_url="/login/")
+def practice_client_detail(request, tenant_id):
+    try:
+        tenant = Tenant.objects.get(id=tenant_id)
+    except Tenant.DoesNotExist as exc:
+        raise Http404("Company not found") from exc
+
+    report = management_report_context(tenant)
+    reconciled_ids = BankReconciliation.objects.filter(tenant=tenant).values("bank_transaction_id")
+    unmatched_bank_transactions = (
+        BankTransaction.objects.filter(tenant=tenant)
+        .exclude(id__in=reconciled_ids)
+        .select_related("imported_file")
+        .order_by("-date", "-id")[:8]
+    )
+    review_journals = Journal.objects.filter(
+        tenant=tenant,
+        status="RequiresReview",
+    ).order_by("-created_at")[:8]
+
+    return render(
+        request,
+        "accounting/practice_client_detail.html",
+        {
+            "tenant": tenant,
+            "report": report,
+            "revenue": _money(report["revenue"]),
+            "expenses": _money(report["expenses"]),
+            "profit": _money(report["profit"]),
+            "vat_due": _money(report["vat_due"]),
+            "latest_documents": EvidenceDocument.objects.filter(tenant=tenant).order_by("-uploaded_at")[:8],
+            "latest_journals": Journal.objects.filter(tenant=tenant).order_by("-date", "-id")[:8],
+            "vat_returns": VatReturn.objects.filter(tenant=tenant).order_by("-end_date")[:6],
+            "client_requests": ClientRequest.objects.filter(tenant=tenant).order_by("-submitted_at")[:8],
+            "unmatched_bank_transactions": unmatched_bank_transactions,
+            "review_journals": review_journals,
+            "hmrc_connection": HmrcVatConnection.objects.filter(tenant=tenant).first(),
+        },
+    )
+
+
+@login_required(login_url="/login/")
 def practice_dashboard(request):
     tenants = list(
         Tenant.objects.annotate(

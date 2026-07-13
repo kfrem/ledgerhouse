@@ -135,7 +135,7 @@
                 </div>
                 <div class="client-list">
                     {% for tenant in tenants %}
-                    <a class="client-row" href="/admin/accounting/tenant/{{ tenant.id }}/change/">
+                    <a class="client-row" href="{% url 'practice_client_detail' tenant.id %}">
                         <span class="client-avatar">{{ tenant.name|slice:":2" }}</span>
                         <span class="client-main">
                             <strong>{{ tenant.name }}</strong>

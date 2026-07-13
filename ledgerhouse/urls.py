@@ -10,6 +10,7 @@ from accounting.views import (
     hmrc_sandbox_status_view,
     hmrc_vat_workspace,
     management_report_view,
+    practice_client_detail,
     practice_dashboard,
 )
 
@@ -17,6 +18,11 @@ urlpatterns = [
     path('', client_portal, name='client_portal'),
     path('vat/review/', client_vat_review, name='client_vat_review'),
     path('practice/', practice_dashboard, name='practice_dashboard'),
+    path(
+        'practice/clients/<uuid:tenant_id>/',
+        practice_client_detail,
+        name='practice_client_detail',
+    ),
     path(
         'reports/<uuid:tenant_id>/',
         management_report_view,

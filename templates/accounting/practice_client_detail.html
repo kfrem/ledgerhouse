@@ -1,0 +1,240 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Client file</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Practice navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Practice file</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}?company={{ tenant.id }}"><span>01</span> Client portal</a>
+            <a class="active" href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a href="{% url 'hmrc_vat_workspace' %}?company={{ tenant.id }}"><span>03</span> VAT workspace</a>
+            <a href="{% url 'management_report' tenant.id %}"><span>04</span> Report</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Client file</p>
+            <strong>{{ tenant.name }}</strong>
+            <small>Operational view of uploads, queries, bookkeeping, VAT and management reporting.</small>
+        </section>
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Practice client file</p>
+                <h1>{{ tenant.name }}</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'practice_dashboard' %}">Portfolio</a>
+                <a class="ghost-button" href="{% url 'client_portal' %}?company={{ tenant.id }}">Client view</a>
+                <a class="solid-button" href="{% url 'management_report' tenant.id %}">Management report</a>
+            </div>
+        </header>
+
+        <section class="summary-grid" aria-label="Client file metrics">
+            <article class="metric">
+                <span>Revenue</span>
+                <strong>{{ revenue }}</strong>
+                <small>Income recorded for this client</small>
+            </article>
+            <article class="metric">
+                <span>Costs</span>
+                <strong>{{ expenses }}</strong>
+                <small>Expenses and cost of sales</small>
+            </article>
+            <article class="metric">
+                <span>Profit</span>
+                <strong>{{ profit }}</strong>
+                <small>Current local management position</small>
+            </article>
+            <article class="metric">
+                <span>VAT due</span>
+                <strong>{{ vat_due }}</strong>
+                <small>{% if hmrc_connection and hmrc_connection.status == "Connected" %}HMRC connected{% else %}HMRC not connected{% endif %}</small>
+            </article>
+        </section>
+
+        <section class="module-grid" aria-label="Client actions">
+            <a class="module-tile ready" href="{% url 'client_portal' %}?company={{ tenant.id }}">
+                <span>Client</span>
+                <strong>Open portal</strong>
+                <small>See the same upload, approval and question surfaces the client sees.</small>
+            </a>
+            <a class="module-tile ready" href="{% url 'hmrc_vat_workspace' %}?company={{ tenant.id }}">
+                <span>VAT</span>
+                <strong>Filing control</strong>
+                <small>Sync obligations, review figures and manage filing approvals.</small>
+            </a>
+            <a class="module-tile" href="{% url 'management_report' tenant.id %}">
+                <span>Reports</span>
+                <strong>Management pack</strong>
+                <small>View and export the latest client finance pack.</small>
+            </a>
+            <a class="module-tile" href="/admin/accounting/tenant/{{ tenant.id }}/change/">
+                <span>Data</span>
+                <strong>Admin record</strong>
+                <small>Open the underlying Django admin record for maintenance.</small>
+            </a>
+        </section>
+
+        <section class="content-grid">
+            <article class="surface workbench-surface">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Client queues</p>
+                        <h2>Work that needs attention</h2>
+                    </div>
+                    <span class="status-pill">Client file</span>
+                </div>
+                <div class="workbench-grid">
+                    <section class="queue-panel">
+                        <div class="queue-heading">
+                            <span>01</span>
+                            <strong>Questions</strong>
+                        </div>
+                        <div class="queue-list">
+                            {% for request_item in client_requests %}
+                            <a class="queue-item" href="/admin/accounting/clientrequest/{{ request_item.id }}/change/">
+                                <span>
+                                    <strong>{{ request_item.subject }}</strong>
+                                    <small>{{ request_item.category }} | {{ request_item.status }} | {{ request_item.submitted_at|date:"d M Y H:i" }}</small>
+                                </span>
+                                <em>{{ request_item.priority }}</em>
+                            </a>
+                            {% empty %}
+                            <div class="empty-state">No client questions have been submitted.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="queue-panel">
+                        <div class="queue-heading">
+                            <span>02</span>
+                            <strong>Uploads</strong>
+                        </div>
+                        <div class="queue-list">
+                            {% for document in latest_documents %}
+                            <a class="queue-item" href="/admin/accounting/evidencedocument/{{ document.id }}/change/">
+                                <span>
+                                    <strong>{{ document.filename }}</strong>
+                                    <small>{{ document.uploaded_by }} | {{ document.uploaded_at|date:"d M Y H:i" }}</small>
+                                </span>
+                                <em>Evidence</em>
+                            </a>
+                            {% empty %}
+                            <div class="empty-state">No evidence documents are stored for this client.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="queue-panel">
+                        <div class="queue-heading">
+                            <span>03</span>
+                            <strong>Unmatched bank</strong>
+                        </div>
+                        <div class="queue-list">
+                            {% for transaction in unmatched_bank_transactions %}
+                            <a class="queue-item" href="/admin/accounting/banktransaction/{{ transaction.id }}/change/">
+                                <span>
+                                    <strong>{{ transaction.reference }}</strong>
+                                    <small>{{ transaction.date }} | {{ transaction.imported_file.filename }}</small>
+                                </span>
+                                <em>GBP {{ transaction.amount }}</em>
+                            </a>
+                            {% empty %}
+                            <div class="empty-state">All imported bank lines are matched for this client.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="queue-panel">
+                        <div class="queue-heading">
+                            <span>04</span>
+                            <strong>Ledger review</strong>
+                        </div>
+                        <div class="queue-list">
+                            {% for journal in review_journals %}
+                            <a class="queue-item" href="/admin/accounting/journal/{{ journal.id }}/change/">
+                                <span>
+                                    <strong>{{ journal.description }}</strong>
+                                    <small>{{ journal.date }} | {{ journal.source_type }}</small>
+                                </span>
+                                <em>{{ journal.status }}</em>
+                            </a>
+                            {% empty %}
+                            <div class="empty-state">No journals are marked for review for this client.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                </div>
+            </article>
+
+            <aside class="right-rail">
+                <article class="surface compliance-card">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">VAT</p>
+                            <h2>Returns</h2>
+                        </div>
+                        <a class="text-link" href="{% url 'hmrc_vat_workspace' %}?company={{ tenant.id }}">Open VAT</a>
+                    </div>
+                    <div class="stack-list">
+                        {% for vat_return in vat_returns %}
+                        <a class="stack-item" href="/admin/accounting/vatreturn/{{ vat_return.id }}/change/">
+                            <span>
+                                <strong>{{ vat_return.start_date }} to {{ vat_return.end_date }}</strong>
+                                <small>{{ vat_return.status }} | {{ vat_return.hmrc_receipt_id|default:"No receipt" }}</small>
+                            </span>
+                            <span class="amount">GBP {{ vat_return.net_vat_payable }}</span>
+                        </a>
+                        {% empty %}
+                        <div class="empty-state">No VAT returns recorded for this client.</div>
+                        {% endfor %}
+                    </div>
+                </article>
+            </aside>
+
+            <article class="surface activity-surface">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Ledger stream</p>
+                        <h2>Recent postings</h2>
+                    </div>
+                    <a class="text-link" href="/admin/accounting/journal/">Open ledger</a>
+                </div>
+                <div class="activity-table">
+                    <div class="table-head">
+                        <span>Date</span>
+                        <span>Source</span>
+                        <span>Description</span>
+                        <span>Status</span>
+                    </div>
+                    {% for journal in latest_journals %}
+                    <a class="table-row" href="/admin/accounting/journal/{{ journal.id }}/change/">
+                        <span>{{ journal.date }}</span>
+                        <strong>{{ journal.source_type }}</strong>
+                        <span>{{ journal.description }}</span>
+                        <span class="status-pill">{{ journal.status }}</span>
+                    </a>
+                    {% empty %}
+                    <div class="empty-state">No journals have been posted for this client.</div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+    </main>
+</body>
+</html>
