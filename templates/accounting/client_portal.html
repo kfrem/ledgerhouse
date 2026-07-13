@@ -173,8 +173,8 @@
                     <div class="request-item muted">
                         <span class="request-dot green"></span>
                         <div>
-                            <strong>Review draft monthly numbers</strong>
-                            <small>Management pack area is prepared for the next build phase.</small>
+                            <strong>Review latest management pack</strong>
+                            <small>Open the in-app report or export it as CSV/PDF from the reports area.</small>
                         </div>
                     </div>
                 </div>
@@ -222,19 +222,20 @@
                     {% empty %}
                     <div class="report-item">
                         <span>
-                            <strong>Monthly management report</strong>
-                            <small>Will appear here when prepared by your accountant.</small>
+                            <strong>VAT filing history</strong>
+                            <small>Submitted VAT summaries will appear here after filing.</small>
                         </span>
-                        <em>Coming</em>
+                        <em>None yet</em>
                     </div>
                     {% endfor %}
                     <div class="report-item">
                         <span>
-                            <strong>Profit and loss pack</strong>
-                            <small>Download a local management pack generated from current records.</small>
+                            <strong>Management report</strong>
+                            <small>View the finance pack generated from current ledger, bank and evidence records.</small>
                         </span>
                         {% if selected_tenant %}
                         <span class="report-actions">
+                            <a href="{% url 'management_report' selected_tenant.id %}">View</a>
                             <a href="{% url 'download_management_report' selected_tenant.id 'csv' %}">CSV</a>
                             <a href="{% url 'download_management_report' selected_tenant.id 'pdf' %}">PDF</a>
                         </span>

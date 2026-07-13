@@ -1,0 +1,161 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Management report</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body class="client-page">
+    <aside class="sidebar client-sidebar" aria-label="Client navigation">
+        <a class="brand" href="{% url 'client_portal' %}?company={{ tenant.id }}" aria-label="LedgerHouse client portal">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Management pack</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}?company={{ tenant.id }}"><span>01</span> Client portal</a>
+            <a href="{% url 'client_vat_review' %}?company={{ tenant.id }}"><span>02</span> VAT approval</a>
+            <a class="active" href="{% url 'management_report' tenant.id %}"><span>03</span> Reports</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Report file</p>
+            <strong>{{ tenant.name }}</strong>
+            <small>Live local report generated from the current ledger, bank activity, VAT records and evidence vault.</small>
+        </section>
+    </aside>
+
+    <main class="workspace client-workspace">
+        <header class="topbar client-topbar">
+            <div>
+                <p class="eyebrow">Management report</p>
+                <h1>{{ tenant.name }}</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'client_portal' %}?company={{ tenant.id }}">Client portal</a>
+                <a class="solid-button" href="{% url 'download_management_report' tenant.id 'pdf' %}">PDF</a>
+                <a class="ghost-button" href="{% url 'download_management_report' tenant.id 'csv' %}">CSV</a>
+            </div>
+        </header>
+
+        <section class="client-status-grid" aria-label="Report summary">
+            <article class="client-status-card ready">
+                <span>Revenue</span>
+                <strong>{{ revenue }}</strong>
+                <small>Income recorded in the ledger</small>
+            </article>
+            <article class="client-status-card">
+                <span>Costs</span>
+                <strong>{{ expenses }}</strong>
+                <small>Expense and cost-of-sales entries</small>
+            </article>
+            <article class="client-status-card">
+                <span>Profit</span>
+                <strong>{{ profit }}</strong>
+                <small>Revenue less recorded costs</small>
+            </article>
+            <article class="client-status-card attention">
+                <span>VAT due</span>
+                <strong>{{ vat_due }}</strong>
+                <small>Submitted VAT payable total</small>
+            </article>
+        </section>
+
+        <section class="client-grid">
+            <article class="client-panel report-detail-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Operations summary</p>
+                        <h2>What has been processed</h2>
+                    </div>
+                </div>
+                <div class="health-grid">
+                    <div>
+                        <span>Bank lines</span>
+                        <strong>{{ report.bank_count }}</strong>
+                    </div>
+                    <div>
+                        <span>Unmatched bank lines</span>
+                        <strong>{{ report.unreconciled_count }}</strong>
+                    </div>
+                    <div>
+                        <span>Evidence documents</span>
+                        <strong>{{ report.evidence_count }}</strong>
+                    </div>
+                </div>
+            </article>
+
+            <article class="client-panel reports-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">VAT</p>
+                        <h2>Filed returns</h2>
+                    </div>
+                </div>
+                <div class="report-list">
+                    {% for vat_return in vat_returns %}
+                    <div class="report-item">
+                        <span>
+                            <strong>{{ vat_return.start_date }} to {{ vat_return.end_date }}</strong>
+                            <small>Receipt {{ vat_return.hmrc_receipt_id|default:"not recorded" }}</small>
+                        </span>
+                        <em>{{ vat_return.status }}</em>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No submitted VAT returns are recorded for this company yet.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="client-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Ledger activity</p>
+                        <h2>Recent bookkeeping</h2>
+                    </div>
+                </div>
+                <div class="client-activity">
+                    {% for journal in latest_journals %}
+                    <div class="activity-item">
+                        <span>{{ journal.date }}</span>
+                        <strong>{{ journal.description }}</strong>
+                        <small>{{ journal.source_type }} - {{ journal.status }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No bookkeeping entries are available for this company yet.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="client-panel upload-history-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Evidence vault</p>
+                        <h2>Recent files</h2>
+                    </div>
+                    <span class="status-pill">{{ report.evidence_count }} files</span>
+                </div>
+                <div class="document-list">
+                    {% for document in latest_documents %}
+                    <div class="document-item">
+                        <span class="document-icon">DOC</span>
+                        <span>
+                            <strong>{{ document.filename }}</strong>
+                            <small>Uploaded {{ document.uploaded_at|date:"d M Y H:i" }} by {{ document.uploaded_by }}</small>
+                        </span>
+                        <em>Stored</em>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No evidence documents are stored for this company yet.</div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+    </main>
+</body>
+</html>

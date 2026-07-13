@@ -17,6 +17,7 @@ from accounting.models import (
     JournalLine,
     NominalAccount,
     Tenant,
+    VatReturn,
 )
 from accounting.reports import management_report_csv, management_report_pdf
 
@@ -209,6 +210,18 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Director card purchase" in body
 
     def test_management_reports_generate_csv_and_pdf(self):
+        VatReturn.objects.create(
+            tenant=self.tenant,
+            start_date="2026-04-01",
+            end_date="2026-06-30",
+            locked_by="Test",
+            total_output_vat=Decimal("200.00"),
+            total_input_vat=Decimal("40.00"),
+            net_vat_payable=Decimal("160.00"),
+            status="Submitted",
+            hmrc_receipt_id="FORM-REPORT",
+            period_key="26A1",
+        )
         csv_report = management_report_csv(self.tenant)
         pdf_report = management_report_pdf(self.tenant)
 
@@ -223,3 +236,41 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert csv_response["Content-Type"] == "text/csv"
         assert pdf_response.status_code == 200
         assert pdf_response["Content-Type"] == "application/pdf"
+
+    def test_client_can_view_management_report_in_app(self):
+        EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="board-pack-receipt.pdf",
+            file_content=b"%PDF-1.4\n% demo receipt\n",
+            content_type="application/pdf",
+            uploaded_by="client",
+        )
+        VatReturn.objects.create(
+            tenant=self.tenant,
+            start_date="2026-04-01",
+            end_date="2026-06-30",
+            locked_by="Test",
+            total_output_vat=Decimal("200.00"),
+            total_input_vat=Decimal("40.00"),
+            net_vat_payable=Decimal("160.00"),
+            status="Submitted",
+            hmrc_receipt_id="FORM-REPORT",
+            period_key="26A1",
+        )
+        self.client.force_login(self.user)
+
+        portal_response = self.client.get(f"/?company={self.tenant.id}")
+        portal_body = portal_response.content.decode()
+        assert portal_response.status_code == 200
+        assert "Management report" in portal_body
+        assert f"/reports/{self.tenant.id}/" in portal_body
+        assert "Coming" not in portal_body
+
+        report_response = self.client.get(f"/reports/{self.tenant.id}/")
+        report_body = report_response.content.decode()
+        assert report_response.status_code == 200
+        assert "LedgerHouse | Management report" in report_body
+        assert "Demo Client Ltd" in report_body
+        assert "GBP 1,200.00" in report_body
+        assert "FORM-REPORT" in report_body
+        assert "board-pack-receipt.pdf" in report_body

@@ -33,7 +33,7 @@ from .models import (
     VatReturn,
     VatReview,
 )
-from .reports import management_report_csv, management_report_pdf
+from .reports import management_report_context, management_report_csv, management_report_pdf
 
 
 def _money(value):
@@ -167,6 +167,35 @@ def client_portal(request):
         "vat_returns": vat_returns,
     }
     return render(request, "accounting/client_portal.html", context)
+
+
+@login_required(login_url="/login/")
+def management_report_view(request, tenant_id):
+    try:
+        tenant = Tenant.objects.get(id=tenant_id)
+    except Tenant.DoesNotExist as exc:
+        raise Http404("Company not found") from exc
+
+    report = management_report_context(tenant)
+    latest_journals = Journal.objects.filter(tenant=tenant).order_by("-date", "-id")[:8]
+    latest_documents = EvidenceDocument.objects.filter(tenant=tenant).order_by("-uploaded_at")[:8]
+    vat_returns = VatReturn.objects.filter(tenant=tenant).order_by("-end_date")[:6]
+
+    return render(
+        request,
+        "accounting/management_report.html",
+        {
+            "tenant": tenant,
+            "report": report,
+            "latest_journals": latest_journals,
+            "latest_documents": latest_documents,
+            "vat_returns": vat_returns,
+            "revenue": _money(report["revenue"]),
+            "expenses": _money(report["expenses"]),
+            "profit": _money(report["profit"]),
+            "vat_due": _money(report["vat_due"]),
+        },
+    )
 
 
 @login_required(login_url="/login/")
