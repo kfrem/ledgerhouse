@@ -23,7 +23,7 @@
             <a href="/admin/accounting/tenant/"><span>03</span> Clients</a>
             <a href="{% url 'practice_ledger_review' %}"><span>04</span> Ledger</a>
             <a href="{% url 'practice_banking_review' %}"><span>05</span> Banking</a>
-            <a href="/admin/accounting/vatreturn/"><span>06</span> VAT</a>
+            <a href="{% url 'hmrc_vat_workspace' %}"><span>06</span> VAT</a>
         </nav>
 
         <section class="sidebar-panel">
@@ -117,7 +117,7 @@
                 <strong>Matching queue</strong>
                 <small>Bank lines and reconciliation status.</small>
             </a>
-            <a class="module-tile" href="/admin/accounting/vatreturn/">
+            <a class="module-tile" href="{% url 'hmrc_vat_workspace' %}">
                 <span>Tax</span>
                 <strong>VAT control</strong>
                 <small>Returns, locks, receipts and submissions.</small>
@@ -156,11 +156,11 @@
                             <p class="eyebrow">Compliance</p>
                             <h2>VAT returns</h2>
                         </div>
-                        <a class="text-link" href="/admin/accounting/vatreturn/">Open</a>
+                        <a class="text-link" href="{% url 'hmrc_vat_workspace' %}">Open</a>
                     </div>
                     <div class="stack-list">
                         {% for vat_return in vat_returns %}
-                        <a class="stack-item" href="/admin/accounting/vatreturn/{{ vat_return.id }}/change/">
+                        <a class="stack-item" href="{% url 'hmrc_vat_workspace' %}?company={{ vat_return.tenant.id }}">
                             <span>
                                 <strong>{{ vat_return.tenant.name }}</strong>
                                 <small>{{ vat_return.start_date }} to {{ vat_return.end_date }}</small>
@@ -290,7 +290,7 @@
                         </div>
                         <div class="queue-list">
                             {% for request_item in client_requests %}
-                            <a class="queue-item" href="/admin/accounting/clientrequest/{{ request_item.id }}/change/">
+                            <a class="queue-item" href="{% url 'practice_client_detail' request_item.tenant.id %}">
                                 <span>
                                     <strong>{{ request_item.subject }}</strong>
                                     <small>{{ request_item.tenant.name }} | {{ request_item.category }} | {{ request_item.submitted_at|date:"d M Y H:i" }}</small>

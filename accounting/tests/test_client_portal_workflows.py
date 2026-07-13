@@ -223,6 +223,7 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Live controls" in body
         assert "Client questions: 1 open" in body
         assert "Next build" not in body
+        assert "/admin/accounting/clientrequest/" not in body
 
     def test_client_can_send_question_to_practice_workbench(self):
         self.client.force_login(self.user)
@@ -312,6 +313,7 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Quote review accrual" in body
         assert f"/reports/{self.tenant.id}/" in body
         assert f"/integrations/hmrc/vat/?company={self.tenant.id}" in body
+        assert "/admin/accounting/banktransaction/" not in body
 
     def test_practice_can_update_client_question_status_in_app(self):
         request_item = ClientRequest.objects.create(

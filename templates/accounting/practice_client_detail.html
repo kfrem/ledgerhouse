@@ -165,7 +165,7 @@
                         </div>
                         <div class="queue-list">
                             {% for transaction in unmatched_bank_transactions %}
-                            <a class="queue-item" href="/admin/accounting/banktransaction/{{ transaction.id }}/change/">
+                            <a class="queue-item" href="{% url 'practice_banking_review' %}?company={{ tenant.id }}">
                                 <span>
                                     <strong>{{ transaction.reference }}</strong>
                                     <small>{{ transaction.date }} | {{ transaction.imported_file.filename }}</small>
@@ -211,7 +211,7 @@
                     </div>
                     <div class="stack-list">
                         {% for vat_return in vat_returns %}
-                        <a class="stack-item" href="/admin/accounting/vatreturn/{{ vat_return.id }}/change/">
+                        <a class="stack-item" href="{% url 'hmrc_vat_workspace' %}?company={{ tenant.id }}">
                             <span>
                                 <strong>{{ vat_return.start_date }} to {{ vat_return.end_date }}</strong>
                                 <small>{{ vat_return.status }} | {{ vat_return.hmrc_receipt_id|default:"No receipt" }}</small>
