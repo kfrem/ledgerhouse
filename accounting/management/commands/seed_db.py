@@ -159,6 +159,83 @@ class Command(BaseCommand):
                     except Journal.DoesNotExist:
                         self.stdout.write(self.style.WARNING(f"Matched journal {tx['matched_to']} not found for statement line {tx['fitid']}."))
 
+                # 7. Seed live work queues for local product testing.
+                expense_acc, _ = NominalAccount.objects.get_or_create(
+                    tenant=tenant,
+                    code="6000",
+                    defaults={
+                        "name": "Office costs",
+                        "category": "Expense",
+                        "canonical_taxonomy": "Expense",
+                    },
+                )
+                creditor_acc, _ = NominalAccount.objects.get_or_create(
+                    tenant=tenant,
+                    code="2100",
+                    defaults={
+                        "name": "Trade creditors",
+                        "category": "Liability",
+                        "canonical_taxonomy": "Payables",
+                    },
+                )
+                with transaction.atomic():
+                    review_journal = Journal.objects.create(
+                        tenant=tenant,
+                        date="2026-07-10",
+                        description=f"{tenant.name} subscription invoice awaiting sign-off",
+                        source_type="SupplierInvoice",
+                        source_id=f"DEMO-REVIEW-{tenant.id}",
+                        created_by="Demo Seeder",
+                        status="RequiresReview",
+                    )
+                    JournalLine.objects.create(
+                        tenant=tenant,
+                        journal=review_journal,
+                        account=expense_acc,
+                        debit=Decimal("125.00"),
+                        credit=Decimal("0.00"),
+                        vat_code="SR",
+                        vat_amount=Decimal("20.83"),
+                    )
+                    JournalLine.objects.create(
+                        tenant=tenant,
+                        journal=review_journal,
+                        account=creditor_acc,
+                        debit=Decimal("0.00"),
+                        credit=Decimal("125.00"),
+                        vat_code="SR",
+                        vat_amount=Decimal("0.00"),
+                    )
+                EvidenceDocument.objects.create(
+                    tenant=tenant,
+                    filename=f"{tenant.name.lower().replace(' ', '-')}-director-card-receipt.pdf",
+                    content_type="application/pdf",
+                    file_content=b"%PDF-1.4\n% demo evidence waiting for review\n",
+                    uploaded_by="client",
+                )
+                ClientRequest.objects.create(
+                    tenant=tenant,
+                    subject="Please review the latest cash position",
+                    category="Cash flow",
+                    priority="High",
+                    message="Management want to know whether the current bank position supports next month's planned spend.",
+                    submitted_by="client",
+                )
+                demo_import = ImportedFile.objects.create(
+                    tenant=tenant,
+                    filename="demo-unmatched-bank.csv",
+                    raw_content="Date,Amount,Reference,FITID\n2026-07-11,-47.95,Unmatched demo card spend,DEMO-UNMATCHED\n",
+                    file_hash=f"demo-unmatched-{tenant.id}",
+                )
+                BankTransaction.objects.create(
+                    tenant=tenant,
+                    imported_file=demo_import,
+                    date="2026-07-11",
+                    amount=Decimal("-47.95"),
+                    reference="Unmatched demo card spend",
+                    fitid=f"DEMO-UNMATCHED-{tenant.id}",
+                )
+
                 self.stdout.write(self.style.SUCCESS(f"Tenant {tenant.name} seeded successfully. Reconciled {reconciled_count} bank statement lines."))
 
         self.stdout.write(self.style.SUCCESS("Database seeding completed!"))

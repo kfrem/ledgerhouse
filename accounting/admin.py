@@ -65,14 +65,14 @@ class ImportedFileAdmin(admin.ModelAdmin):
 
 @admin.register(BankTransaction)
 class BankTransactionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'tenant', 'date', 'amount', 'reference', 'fitid')
-    list_filter = ('tenant',)
+    list_display = ('id', 'tenant', 'date', 'amount', 'reference', 'fitid', 'review_status', 'reviewed_by')
+    list_filter = ('tenant', 'review_status')
     search_fields = ('reference', 'fitid')
 
 @admin.register(EvidenceDocument)
 class EvidenceDocumentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'tenant', 'filename', 'content_type', 'uploaded_at', 'uploaded_by')
-    list_filter = ('tenant',)
+    list_display = ('id', 'tenant', 'filename', 'content_type', 'uploaded_at', 'uploaded_by', 'review_status', 'reviewed_by')
+    list_filter = ('tenant', 'review_status')
 
 @admin.register(JournalEvidenceLink)
 class JournalEvidenceLinkAdmin(admin.ModelAdmin):

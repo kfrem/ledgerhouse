@@ -106,6 +106,29 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Portfolio command centre" in body
         assert "Practice" in body
 
+    def test_practice_can_create_client_in_app(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            "/practice/clients/",
+            {
+                "action": "create_client",
+                "name": "Northstar Design Ltd",
+            },
+        )
+
+        tenant = Tenant.objects.get(name="Northstar Design Ltd")
+        assert response.status_code == 302
+        assert response["Location"] == f"/practice/clients/{tenant.id}/"
+        assert NominalAccount.objects.filter(tenant=tenant).count() == 6
+
+        list_response = self.client.get("/practice/clients/")
+        list_body = list_response.content.decode()
+        assert list_response.status_code == 200
+        assert "Client management" in list_body
+        assert "Northstar Design Ltd" in list_body
+        assert f"/practice/clients/{tenant.id}/" in list_body
+
     def test_csv_upload_imports_bank_transactions(self):
         self.client.force_login(self.user)
         csv_file = SimpleUploadedFile(
@@ -401,6 +424,21 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert f"/practice/clients/{open_transaction.tenant.id}/" in body
         assert "/admin/accounting/banktransaction/" in body
 
+        update_response = self.client.post(
+            f"/practice/banking/?company={self.tenant.id}",
+            {
+                "action": "update_bank_review",
+                "transaction_id": str(open_transaction.id),
+                "review_status": "ReadyToPost",
+                "company": str(self.tenant.id),
+            },
+        )
+        open_transaction.refresh_from_db()
+        assert update_response.status_code == 302
+        assert open_transaction.review_status == "ReadyToPost"
+        assert open_transaction.reviewed_by == "admin"
+        assert open_transaction.reviewed_at is not None
+
     def test_practice_can_review_filtered_ledger_in_app(self):
         review_journal = Journal.objects.create(
             tenant=self.tenant,
@@ -433,6 +471,19 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Posted receipt" not in body
         assert f"/practice/clients/{review_journal.tenant.id}/" in body
         assert "/admin/accounting/journal/" in body
+
+        approve_response = self.client.post(
+            f"/practice/ledger/?company={self.tenant.id}&status=RequiresReview",
+            {
+                "action": "approve_journal",
+                "journal_id": str(review_journal.id),
+                "company": str(self.tenant.id),
+                "status": "RequiresReview",
+            },
+        )
+        review_journal.refresh_from_db()
+        assert approve_response.status_code == 302
+        assert review_journal.status == "Posted"
 
     def test_practice_can_review_evidence_uploads_in_app(self):
         unlinked_document = EvidenceDocument.objects.create(
@@ -477,6 +528,21 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Unlinked" in body
         assert f"/practice/clients/{unlinked_document.tenant.id}/" in body
         assert "/admin/accounting/evidencedocument/" in body
+
+        update_response = self.client.post(
+            f"/practice/evidence/?company={self.tenant.id}",
+            {
+                "action": "update_evidence_review",
+                "document_id": str(unlinked_document.id),
+                "review_status": "ReadyForPosting",
+                "company": str(self.tenant.id),
+            },
+        )
+        unlinked_document.refresh_from_db()
+        assert update_response.status_code == 302
+        assert unlinked_document.review_status == "ReadyForPosting"
+        assert unlinked_document.reviewed_by == "admin"
+        assert unlinked_document.reviewed_at is not None
 
     def test_client_question_requires_subject_and_message(self):
         self.client.force_login(self.user)

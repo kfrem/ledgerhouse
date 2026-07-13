@@ -20,7 +20,7 @@
         <nav class="nav-list">
             <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
             <a class="active" href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
-            <a href="/admin/accounting/tenant/"><span>03</span> Clients</a>
+            <a href="{% url 'practice_clients' %}"><span>03</span> Clients</a>
             <a href="{% url 'practice_ledger_review' %}"><span>04</span> Ledger</a>
             <a href="{% url 'practice_banking_review' %}"><span>05</span> Banking</a>
             <a href="{% url 'hmrc_vat_workspace' %}"><span>06</span> VAT</a>
@@ -102,7 +102,7 @@
         </section>
 
         <section class="module-grid" aria-label="Product modules">
-            <a class="module-tile ready" href="/admin/accounting/tenant/">
+            <a class="module-tile ready" href="{% url 'practice_clients' %}">
                 <span>Clients</span>
                 <strong>Portfolio records</strong>
                 <small>Manage entities, accounts and source activity.</small>
@@ -131,7 +131,7 @@
                         <p class="eyebrow">Portfolio</p>
                         <h2>Client book</h2>
                     </div>
-                    <a class="text-link" href="/admin/accounting/tenant/">Manage clients</a>
+                    <a class="text-link" href="{% url 'practice_clients' %}">Manage clients</a>
                 </div>
                 <div class="client-list">
                     {% for tenant in tenants %}

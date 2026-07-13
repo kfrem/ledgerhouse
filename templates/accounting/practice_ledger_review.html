@@ -44,6 +44,14 @@
             </div>
         </header>
 
+        {% if messages %}
+        <div class="message-list page-messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <section class="summary-grid" aria-label="Ledger review metrics">
             <article class="metric">
                 <span>Shown</span>
@@ -127,15 +135,30 @@
                     <span>Date</span>
                     <span>Client</span>
                     <span>Source</span>
-                    <span>Status</span>
+                    <span>Action</span>
                 </div>
                 {% for journal in journals %}
-                <a class="table-row" href="{% url 'practice_client_detail' journal.tenant.id %}">
+                <div class="table-row">
                     <span>{{ journal.date }}</span>
-                    <strong>{{ journal.tenant.name }}</strong>
+                    <strong><a class="text-link" href="{% url 'practice_client_detail' journal.tenant.id %}">{{ journal.tenant.name }}</a></strong>
                     <span>{{ journal.source_type }} | {{ journal.description }}</span>
+                    {% if journal.status == "Posted" %}
                     <span class="status-pill">{{ journal.status }}</span>
-                </a>
+                    {% else %}
+                    <form class="request-triage-form" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="approve_journal">
+                        <input type="hidden" name="journal_id" value="{{ journal.id }}">
+                        {% if selected_tenant %}
+                        <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                        {% endif %}
+                        {% if selected_status %}
+                        <input type="hidden" name="status" value="{{ selected_status }}">
+                        {% endif %}
+                        <button class="solid-button" type="submit">Approve</button>
+                    </form>
+                    {% endif %}
+                </div>
                 {% empty %}
                 <div class="empty-state">No journals match this view.</div>
                 {% endfor %}

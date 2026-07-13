@@ -44,6 +44,14 @@
             </div>
         </header>
 
+        {% if messages %}
+        <div class="message-list page-messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <section class="summary-grid" aria-label="Evidence review metrics">
             <article class="metric">
                 <span>Documents shown</span>
@@ -110,15 +118,29 @@
                     <span>Uploaded</span>
                     <span>Client</span>
                     <span>Document</span>
-                    <span>Type</span>
+                    <span>Action</span>
                 </div>
                 {% for document in documents %}
-                <a class="table-row" href="{% url 'practice_client_detail' document.tenant.id %}">
+                <div class="table-row">
                     <span>{{ document.uploaded_at|date:"d M Y H:i" }}</span>
-                    <strong>{{ document.tenant.name }}</strong>
+                    <strong><a class="text-link" href="{% url 'practice_client_detail' document.tenant.id %}">{{ document.tenant.name }}</a></strong>
                     <span>{{ document.filename }} | uploaded by {{ document.uploaded_by }}</span>
-                    <span class="status-pill">{{ document.content_type }}</span>
-                </a>
+                    <form class="request-triage-form" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update_evidence_review">
+                        <input type="hidden" name="document_id" value="{{ document.id }}">
+                        {% if selected_tenant %}
+                        <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                        {% endif %}
+                        <select name="review_status" aria-label="Evidence review status">
+                            <option value="Unreviewed" {% if document.review_status == "Unreviewed" %}selected{% endif %}>Unreviewed</option>
+                            <option value="NeedsInfo" {% if document.review_status == "NeedsInfo" %}selected{% endif %}>Needs info</option>
+                            <option value="ReadyForPosting" {% if document.review_status == "ReadyForPosting" %}selected{% endif %}>Ready for posting</option>
+                            <option value="Reviewed" {% if document.review_status == "Reviewed" %}selected{% endif %}>Reviewed</option>
+                        </select>
+                        <button class="ghost-button" type="submit">Update</button>
+                    </form>
+                </div>
                 {% empty %}
                 <div class="empty-state">No evidence documents match this view.</div>
                 {% endfor %}

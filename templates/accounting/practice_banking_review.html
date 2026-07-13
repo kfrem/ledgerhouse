@@ -43,6 +43,14 @@
             </div>
         </header>
 
+        {% if messages %}
+        <div class="message-list page-messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <section class="summary-grid" aria-label="Banking review metrics">
             <article class="metric">
                 <span>Unmatched lines</span>
@@ -109,15 +117,29 @@
                     <span>Date</span>
                     <span>Client</span>
                     <span>Reference</span>
-                    <span>Amount</span>
+                    <span>Action</span>
                 </div>
                 {% for transaction in unmatched_bank_transactions %}
-                <a class="table-row" href="{% url 'practice_client_detail' transaction.tenant.id %}">
+                <div class="table-row">
                     <span>{{ transaction.date }}</span>
-                    <strong>{{ transaction.tenant.name }}</strong>
+                    <strong><a class="text-link" href="{% url 'practice_client_detail' transaction.tenant.id %}">{{ transaction.tenant.name }}</a></strong>
                     <span>{{ transaction.reference }} | {{ transaction.imported_file.filename }}</span>
-                    <span class="status-pill">GBP {{ transaction.amount }}</span>
-                </a>
+                    <form class="request-triage-form" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update_bank_review">
+                        <input type="hidden" name="transaction_id" value="{{ transaction.id }}">
+                        {% if selected_tenant %}
+                        <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                        {% endif %}
+                        <select name="review_status" aria-label="Bank review status">
+                            <option value="Unreviewed" {% if transaction.review_status == "Unreviewed" %}selected{% endif %}>Unreviewed</option>
+                            <option value="NeedsInfo" {% if transaction.review_status == "NeedsInfo" %}selected{% endif %}>Needs info</option>
+                            <option value="ReadyToPost" {% if transaction.review_status == "ReadyToPost" %}selected{% endif %}>Ready to post</option>
+                            <option value="Reviewed" {% if transaction.review_status == "Reviewed" %}selected{% endif %}>Reviewed</option>
+                        </select>
+                        <button class="ghost-button" type="submit">Update</button>
+                    </form>
+                </div>
                 {% empty %}
                 <div class="empty-state">All imported bank lines are reconciled for this view.</div>
                 {% endfor %}

@@ -29,7 +29,9 @@ from .models import (
     EvidenceDocument,
     HmrcVatConnection,
     Journal,
+    JournalEvidenceLink,
     JournalLine,
+    NominalAccount,
     Tenant,
     VatReturn,
     VatReview,
@@ -81,6 +83,27 @@ def _ensure_vat_review_for_obligation(tenant, obligation):
         review.prepared_payload = prepared
         review.save(update_fields=["start_date", "end_date", "due_date", "prepared_payload", "updated_at"])
     return review, prepared
+
+
+def _ensure_default_nominals(tenant):
+    accounts = [
+        ("1200", "Bank", "Asset", "Cash"),
+        ("2100", "Trade creditors", "Liability", "Payables"),
+        ("2200", "VAT control", "Liability", "VAT"),
+        ("4000", "Sales", "Revenue", "Revenue"),
+        ("5000", "Cost of sales", "Cost of Sales", "CostOfSales"),
+        ("6000", "Office costs", "Expense", "Expense"),
+    ]
+    for code, name, category, taxonomy in accounts:
+        NominalAccount.objects.get_or_create(
+            tenant=tenant,
+            code=code,
+            defaults={
+                "name": name,
+                "category": category,
+                "canonical_taxonomy": taxonomy,
+            },
+        )
 
 
 @login_required(login_url="/login/")
@@ -243,6 +266,47 @@ def download_management_report(request, tenant_id, file_format):
 
 
 @login_required(login_url="/login/")
+def practice_clients(request):
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_client":
+            name = (request.POST.get("name") or "").strip()
+            if not name:
+                messages.error(request, "Enter a client name before creating the record.")
+            elif Tenant.objects.filter(name__iexact=name).exists():
+                messages.error(request, "A client with this name already exists.")
+            else:
+                tenant = Tenant.objects.create(name=name[:100])
+                _ensure_default_nominals(tenant)
+                messages.success(request, f"{tenant.name} was created with a starter chart of accounts.")
+                return redirect("practice_client_detail", tenant_id=tenant.id)
+        return redirect("practice_clients")
+
+    tenants = list(
+        Tenant.objects.annotate(
+            journals_count=Count("journal", distinct=True),
+            bank_count=Count("banktransaction", distinct=True),
+            evidence_count=Count("evidencedocument", distinct=True),
+            open_questions=Count(
+                "client_requests",
+                filter=~Q(client_requests__status="Resolved"),
+                distinct=True,
+            ),
+            latest_activity=Max("journal__created_at"),
+        ).order_by("name")
+    )
+
+    return render(
+        request,
+        "accounting/practice_clients.html",
+        {
+            "tenants": tenants,
+            "tenant_count": len(tenants),
+        },
+    )
+
+
+@login_required(login_url="/login/")
 def practice_client_detail(request, tenant_id):
     try:
         tenant = Tenant.objects.get(id=tenant_id)
@@ -312,6 +376,31 @@ def practice_banking_review(request):
     requested_tenant = request.GET.get("company")
     selected_tenant = None
 
+    if request.method == "POST":
+        action = request.POST.get("action")
+        transaction_id = request.POST.get("transaction_id")
+        status = request.POST.get("review_status")
+        valid_statuses = {"Unreviewed", "NeedsInfo", "ReadyToPost", "Reviewed"}
+        bank_transaction = BankTransaction.objects.filter(id=transaction_id).select_related("tenant").first()
+        if action != "update_bank_review" or not bank_transaction:
+            messages.error(request, "Bank transaction was not found.")
+        elif status not in valid_statuses:
+            messages.error(request, "Choose a valid banking review status.")
+        else:
+            bank_transaction.review_status = status
+            if status == "Unreviewed":
+                bank_transaction.reviewed_at = None
+                bank_transaction.reviewed_by = ""
+            else:
+                bank_transaction.reviewed_at = timezone.now()
+                bank_transaction.reviewed_by = request.user.get_username() or "practice"
+            bank_transaction.save(update_fields=["review_status", "reviewed_at", "reviewed_by"])
+            messages.success(request, f"Bank line marked {status}.")
+        redirect_url = request.path
+        if request.POST.get("company"):
+            redirect_url = f"{redirect_url}?company={request.POST.get('company')}"
+        return redirect(redirect_url)
+
     queryset = BankTransaction.objects.select_related("tenant", "imported_file")
     if requested_tenant:
         selected_tenant = next(
@@ -357,6 +446,28 @@ def practice_ledger_review(request):
     selected_tenant = None
     selected_status = request.GET.get("status") or ""
 
+    if request.method == "POST":
+        action = request.POST.get("action")
+        journal_id = request.POST.get("journal_id")
+        journal = Journal.objects.filter(id=journal_id).select_related("tenant").first()
+        if action != "approve_journal" or not journal:
+            messages.error(request, "Journal was not found.")
+        elif journal.status == "Posted":
+            messages.info(request, "Journal is already posted.")
+        else:
+            journal.status = "Posted"
+            journal.save(update_fields=["status"])
+            messages.success(request, "Journal approved and marked Posted.")
+        redirect_url = request.path
+        params = []
+        if request.POST.get("company"):
+            params.append(f"company={request.POST.get('company')}")
+        if request.POST.get("status"):
+            params.append(f"status={request.POST.get('status')}")
+        if params:
+            redirect_url = f"{redirect_url}?{'&'.join(params)}"
+        return redirect(redirect_url)
+
     queryset = Journal.objects.select_related("tenant")
     if requested_tenant:
         selected_tenant = next(
@@ -398,6 +509,31 @@ def practice_evidence_review(request):
     tenants = list(Tenant.objects.order_by("name"))
     requested_tenant = request.GET.get("company")
     selected_tenant = None
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        document_id = request.POST.get("document_id")
+        status = request.POST.get("review_status")
+        valid_statuses = {"Unreviewed", "NeedsInfo", "ReadyForPosting", "Reviewed"}
+        document = EvidenceDocument.objects.filter(id=document_id).select_related("tenant").first()
+        if action != "update_evidence_review" or not document:
+            messages.error(request, "Evidence document was not found.")
+        elif status not in valid_statuses:
+            messages.error(request, "Choose a valid evidence review status.")
+        else:
+            document.review_status = status
+            if status == "Unreviewed":
+                document.reviewed_at = None
+                document.reviewed_by = ""
+            else:
+                document.reviewed_at = timezone.now()
+                document.reviewed_by = request.user.get_username() or "practice"
+            document.save(update_fields=["review_status", "reviewed_at", "reviewed_by"])
+            messages.success(request, f"Evidence marked {status}.")
+        redirect_url = request.path
+        if request.POST.get("company"):
+            redirect_url = f"{redirect_url}?company={request.POST.get('company')}"
+        return redirect(redirect_url)
 
     queryset = EvidenceDocument.objects.select_related("tenant")
     if requested_tenant:

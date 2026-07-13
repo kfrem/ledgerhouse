@@ -133,6 +133,9 @@ class BankTransaction(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     reference = models.CharField(max_length=255)
     fitid = models.CharField(max_length=100)
+    review_status = models.CharField(max_length=20, default='Unreviewed')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.CharField(max_length=100, blank=True, default='')
 
     class Meta:
         unique_together = ('tenant', 'fitid')
@@ -149,6 +152,9 @@ class EvidenceDocument(models.Model):
     content_type = models.CharField(max_length=100)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     uploaded_by = models.CharField(max_length=100)
+    review_status = models.CharField(max_length=20, default='Unreviewed')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.CharField(max_length=100, blank=True, default='')
 
     def __str__(self):
         return f"Evidence {self.filename} ({self.content_type})"

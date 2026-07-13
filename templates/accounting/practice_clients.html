@@ -1,0 +1,119 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Clients</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Practice navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Client control</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
+            <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a class="active" href="{% url 'practice_clients' %}"><span>03</span> Clients</a>
+            <a href="{% url 'practice_ledger_review' %}"><span>04</span> Ledger</a>
+            <a href="{% url 'practice_banking_review' %}"><span>05</span> Banking</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Portfolio</p>
+            <strong>{{ tenant_count }} clients</strong>
+            <small>Create clients, open files and monitor operational readiness.</small>
+        </section>
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Practice clients</p>
+                <h1>Client management</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'practice_dashboard' %}">Portfolio</a>
+                <a class="ghost-button" href="/admin/accounting/tenant/">Admin fallback</a>
+            </div>
+        </header>
+
+        {% if messages %}
+        <div class="message-list page-messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <section class="summary-grid" aria-label="Client management metrics">
+            <article class="metric">
+                <span>Clients</span>
+                <strong>{{ tenant_count }}</strong>
+                <small>Companies currently managed here</small>
+            </article>
+            <article class="metric">
+                <span>Setup</span>
+                <strong>Starter chart</strong>
+                <small>New clients receive core ledgers automatically</small>
+            </article>
+            <article class="metric">
+                <span>Workflows</span>
+                <strong>Portal ready</strong>
+                <small>Upload, reporting, VAT and question queues are enabled</small>
+            </article>
+            <article class="metric">
+                <span>Control</span>
+                <strong>Practice-owned</strong>
+                <small>Routine client work stays outside Django admin</small>
+            </article>
+        </section>
+
+        <section class="surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Create</p>
+                    <h2>Add client</h2>
+                </div>
+                <span class="status-pill">Local setup</span>
+            </div>
+            <form class="request-triage-form" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_client">
+                <input name="name" maxlength="100" placeholder="Client company name" aria-label="Client company name">
+                <button class="solid-button" type="submit">Create client</button>
+            </form>
+        </section>
+
+        <section class="surface client-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Portfolio</p>
+                    <h2>Client records</h2>
+                </div>
+                <span class="status-pill">Live data</span>
+            </div>
+            <div class="client-list">
+                {% for tenant in tenants %}
+                <a class="client-row" href="{% url 'practice_client_detail' tenant.id %}">
+                    <span class="client-avatar">{{ tenant.name|slice:":2" }}</span>
+                    <span class="client-main">
+                        <strong>{{ tenant.name }}</strong>
+                        <small>{{ tenant.journals_count }} journals | {{ tenant.bank_count }} bank lines | {{ tenant.evidence_count }} documents | {{ tenant.open_questions }} open questions</small>
+                    </span>
+                    <span class="status-pill">Open file</span>
+                </a>
+                {% empty %}
+                <div class="empty-state">No client records have been loaded yet.</div>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+</body>
+</html>
