@@ -394,6 +394,44 @@ def practice_ledger_review(request):
 
 
 @login_required(login_url="/login/")
+def practice_evidence_review(request):
+    tenants = list(Tenant.objects.order_by("name"))
+    requested_tenant = request.GET.get("company")
+    selected_tenant = None
+
+    queryset = EvidenceDocument.objects.select_related("tenant")
+    if requested_tenant:
+        selected_tenant = next(
+            (tenant for tenant in tenants if str(tenant.id) == requested_tenant),
+            None,
+        )
+        if selected_tenant:
+            queryset = queryset.filter(tenant=selected_tenant)
+
+    documents = list(queryset.order_by("-uploaded_at", "-id")[:100])
+    document_count = len(documents)
+    linked_document_ids = set(
+        Journal.objects.filter(evidence_links__document__in=documents)
+        .values_list("evidence_links__document_id", flat=True)
+        .distinct()
+    )
+    unlinked_count = document_count - len(linked_document_ids)
+
+    return render(
+        request,
+        "accounting/practice_evidence_review.html",
+        {
+            "tenants": tenants,
+            "selected_tenant": selected_tenant,
+            "documents": documents,
+            "document_count": document_count,
+            "linked_count": len(linked_document_ids),
+            "unlinked_count": unlinked_count,
+        },
+    )
+
+
+@login_required(login_url="/login/")
 def practice_dashboard(request):
     tenants = list(
         Tenant.objects.annotate(

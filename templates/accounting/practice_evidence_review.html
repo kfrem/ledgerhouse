@@ -1,0 +1,129 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Evidence review</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Practice navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Evidence control</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
+            <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a class="active" href="{% url 'practice_evidence_review' %}"><span>03</span> Evidence</a>
+            <a href="{% url 'practice_ledger_review' %}"><span>04</span> Ledger</a>
+            <a href="{% url 'practice_banking_review' %}"><span>05</span> Banking</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Upload inbox</p>
+            <strong>{{ document_count }} documents</strong>
+            <small>Client files, receipts and invoices waiting for bookkeeping treatment.</small>
+        </section>
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Practice evidence</p>
+                <h1>Evidence review</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'practice_dashboard' %}">Portfolio</a>
+                <a class="ghost-button" href="/admin/accounting/evidencedocument/">Admin fallback</a>
+            </div>
+        </header>
+
+        <section class="summary-grid" aria-label="Evidence review metrics">
+            <article class="metric">
+                <span>Documents shown</span>
+                <strong>{{ document_count }}</strong>
+                <small>{% if selected_tenant %}Filtered to {{ selected_tenant.name }}{% else %}Latest uploads{% endif %}</small>
+            </article>
+            <article class="metric">
+                <span>Linked</span>
+                <strong>{{ linked_count }}</strong>
+                <small>Documents already attached to journals</small>
+            </article>
+            <article class="metric">
+                <span>Unlinked</span>
+                <strong>{{ unlinked_count }}</strong>
+                <small>Documents still needing treatment</small>
+            </article>
+            <article class="metric">
+                <span>Client</span>
+                <strong>{% if selected_tenant %}{{ selected_tenant.name }}{% else %}All clients{% endif %}</strong>
+                <small>Use the client filter below to narrow the inbox</small>
+            </article>
+        </section>
+
+        <section class="surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Client filter</p>
+                    <h2>Choose a company</h2>
+                </div>
+                {% if selected_tenant %}
+                <a class="text-link" href="{% url 'practice_evidence_review' %}">Clear filter</a>
+                {% endif %}
+            </div>
+            <div class="client-list">
+                {% for tenant in tenants %}
+                <a class="client-row" href="{% url 'practice_evidence_review' %}?company={{ tenant.id }}">
+                    <span class="client-avatar">{{ tenant.name|slice:":2" }}</span>
+                    <span class="client-main">
+                        <strong>{{ tenant.name }}</strong>
+                        <small>{% if selected_tenant and selected_tenant.id == tenant.id %}Current evidence inbox{% else %}Open evidence inbox{% endif %}</small>
+                    </span>
+                    {% if selected_tenant and selected_tenant.id == tenant.id %}
+                    <span class="status-pill">Selected</span>
+                    {% else %}
+                    <span class="status-pill">Open</span>
+                    {% endif %}
+                </a>
+                {% empty %}
+                <div class="empty-state">No client records have been loaded yet.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface activity-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Upload stream</p>
+                    <h2>Documents awaiting treatment</h2>
+                </div>
+                <span class="status-pill">Live data</span>
+            </div>
+            <div class="activity-table">
+                <div class="table-head">
+                    <span>Uploaded</span>
+                    <span>Client</span>
+                    <span>Document</span>
+                    <span>Type</span>
+                </div>
+                {% for document in documents %}
+                <a class="table-row" href="{% url 'practice_client_detail' document.tenant.id %}">
+                    <span>{{ document.uploaded_at|date:"d M Y H:i" }}</span>
+                    <strong>{{ document.tenant.name }}</strong>
+                    <span>{{ document.filename }} | uploaded by {{ document.uploaded_by }}</span>
+                    <span class="status-pill">{{ document.content_type }}</span>
+                </a>
+                {% empty %}
+                <div class="empty-state">No evidence documents match this view.</div>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+</body>
+</html>

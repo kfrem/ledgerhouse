@@ -230,7 +230,7 @@
                         </div>
                         <div class="queue-list">
                             {% for document in upload_inbox %}
-                            <a class="queue-item" href="/admin/accounting/evidencedocument/{{ document.id }}/change/">
+                            <a class="queue-item" href="{% url 'practice_evidence_review' %}?company={{ document.tenant.id }}">
                                 <span>
                                     <strong>{{ document.filename }}</strong>
                                     <small>{{ document.tenant.name }} | {{ document.uploaded_at|date:"d M Y H:i" }}</small>

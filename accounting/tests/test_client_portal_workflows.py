@@ -16,6 +16,7 @@ from accounting.models import (
     EvidenceDocument,
     ImportedFile,
     Journal,
+    JournalEvidenceLink,
     JournalLine,
     NominalAccount,
     Tenant,
@@ -430,6 +431,50 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Posted receipt" not in body
         assert f"/practice/clients/{review_journal.tenant.id}/" in body
         assert "/admin/accounting/journal/" in body
+
+    def test_practice_can_review_evidence_uploads_in_app(self):
+        unlinked_document = EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="unlinked-receipt.pdf",
+            file_content=b"%PDF-1.4\n% unlinked receipt\n",
+            content_type="application/pdf",
+            uploaded_by="client",
+        )
+        linked_document = EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="linked-invoice.pdf",
+            file_content=b"%PDF-1.4\n% linked invoice\n",
+            content_type="application/pdf",
+            uploaded_by="client",
+        )
+        journal = Journal.objects.create(
+            tenant=self.tenant,
+            date="2026-07-10",
+            description="Invoice with evidence",
+            source_type="SupplierInvoice",
+            source_id="SI-EVIDENCE",
+            created_by="Test",
+        )
+        JournalEvidenceLink.objects.create(
+            tenant=self.tenant,
+            journal=journal,
+            document=linked_document,
+            linked_by="Test",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"/practice/evidence/?company={self.tenant.id}")
+        body = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Evidence review" in body
+        assert "unlinked-receipt.pdf" in body
+        assert "linked-invoice.pdf" in body
+        assert "Documents shown" in body
+        assert "Linked" in body
+        assert "Unlinked" in body
+        assert f"/practice/clients/{unlinked_document.tenant.id}/" in body
+        assert "/admin/accounting/evidencedocument/" in body
 
     def test_client_question_requires_subject_and_message(self):
         self.client.force_login(self.user)

@@ -145,7 +145,7 @@
                         </div>
                         <div class="queue-list">
                             {% for document in latest_documents %}
-                            <a class="queue-item" href="/admin/accounting/evidencedocument/{{ document.id }}/change/">
+                            <a class="queue-item" href="{% url 'practice_evidence_review' %}?company={{ tenant.id }}">
                                 <span>
                                     <strong>{{ document.filename }}</strong>
                                     <small>{{ document.uploaded_by }} | {{ document.uploaded_at|date:"d M Y H:i" }}</small>
