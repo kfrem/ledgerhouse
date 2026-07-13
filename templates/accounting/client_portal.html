@@ -141,7 +141,7 @@
                             <strong>{{ document.filename }}</strong>
                             <small>Uploaded {{ document.uploaded_at|date:"d M Y H:i" }} by {{ document.uploaded_by }}</small>
                         </span>
-                        <em>Stored</em>
+                        <em>{{ document.review_status }}</em>
                     </div>
                     {% empty %}
                     <div class="empty-state">No uploaded evidence yet. Use the upload box and your files will appear here immediately.</div>

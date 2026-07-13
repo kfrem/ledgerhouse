@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import Http404, HttpResponse
+from django.db import transaction
 from django.db.models import Count, Max, Q, Sum
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -23,6 +24,7 @@ from .mtd import (
     unpack_hmrc_state,
 )
 from .models import (
+    AuditEvent,
     BankReconciliation,
     BankTransaction,
     ClientRequest,
@@ -104,6 +106,145 @@ def _ensure_default_nominals(tenant):
                 "canonical_taxonomy": taxonomy,
             },
         )
+
+
+def _ensure_nominal(tenant, code, name, category, taxonomy):
+    account, _ = NominalAccount.objects.get_or_create(
+        tenant=tenant,
+        code=code,
+        defaults={
+            "name": name,
+            "category": category,
+            "canonical_taxonomy": taxonomy,
+        },
+    )
+    return account
+
+
+def _record_audit_event(tenant, event_type, username, description, details=None):
+    AuditEvent.objects.create(
+        tenant=tenant,
+        event_type=event_type,
+        username=username or "practice",
+        description=description,
+        details=details or {},
+    )
+
+
+def _create_evidence_review_journal(document, username):
+    source_id = f"EVIDENCE-{document.id}"
+    existing = Journal.objects.filter(
+        tenant=document.tenant,
+        source_type="EvidenceReview",
+        source_id=source_id,
+    ).first()
+    if existing:
+        return existing, False
+
+    suspense = _ensure_nominal(document.tenant, "9999", "Evidence review suspense", "Asset", "Suspense")
+
+    with transaction.atomic():
+        journal = Journal.objects.create(
+            tenant=document.tenant,
+            date=timezone.localdate(),
+            description=f"Evidence review: {document.filename}",
+            source_type="EvidenceReview",
+            source_id=source_id,
+            created_by=username or "practice",
+            status="RequiresReview",
+        )
+        JournalLine.objects.create(
+            tenant=document.tenant,
+            journal=journal,
+            account=suspense,
+            debit=Decimal("0.00"),
+            credit=Decimal("0.00"),
+        )
+        JournalLine.objects.create(
+            tenant=document.tenant,
+            journal=journal,
+            account=suspense,
+            debit=Decimal("0.00"),
+            credit=Decimal("0.00"),
+        )
+        JournalEvidenceLink.objects.get_or_create(
+            tenant=document.tenant,
+            journal=journal,
+            document=document,
+            defaults={"linked_by": username or "practice"},
+        )
+        journal.status = "RequiresReview"
+        journal.save(update_fields=["status"])
+
+    return journal, True
+
+
+def _post_unmatched_bank_transaction(bank_transaction, username):
+    existing_link = BankReconciliation.objects.filter(bank_transaction=bank_transaction).first()
+    existing_journal = Journal.objects.filter(
+        tenant=bank_transaction.tenant,
+        source_id=bank_transaction.fitid,
+        source_type__in=["BankPayment", "BankReceipt"],
+    ).first()
+    if existing_link and existing_journal:
+        return existing_journal, False
+
+    bank = _ensure_nominal(bank_transaction.tenant, "1200", "Bank", "Asset", "Cash")
+    expense = _ensure_nominal(bank_transaction.tenant, "6000", "Office costs", "Expense", "Expense")
+    revenue = _ensure_nominal(bank_transaction.tenant, "4000", "Sales", "Revenue", "Revenue")
+    amount = abs(bank_transaction.amount)
+    source_type = "BankPayment" if bank_transaction.amount < 0 else "BankReceipt"
+
+    with transaction.atomic():
+        journal = existing_journal or Journal.objects.create(
+            tenant=bank_transaction.tenant,
+            date=bank_transaction.date,
+            description=f"Auto-posted unmatched bank line: {bank_transaction.reference}",
+            source_type=source_type,
+            source_id=bank_transaction.fitid,
+            created_by=username or "practice",
+        )
+        if not existing_journal:
+            if bank_transaction.amount < 0:
+                JournalLine.objects.create(
+                    tenant=bank_transaction.tenant,
+                    journal=journal,
+                    account=expense,
+                    debit=amount,
+                    credit=Decimal("0.00"),
+                )
+                JournalLine.objects.create(
+                    tenant=bank_transaction.tenant,
+                    journal=journal,
+                    account=bank,
+                    debit=Decimal("0.00"),
+                    credit=amount,
+                )
+            else:
+                JournalLine.objects.create(
+                    tenant=bank_transaction.tenant,
+                    journal=journal,
+                    account=bank,
+                    debit=amount,
+                    credit=Decimal("0.00"),
+                )
+                JournalLine.objects.create(
+                    tenant=bank_transaction.tenant,
+                    journal=journal,
+                    account=revenue,
+                    debit=Decimal("0.00"),
+                    credit=amount,
+                )
+        BankReconciliation.objects.get_or_create(
+            tenant=bank_transaction.tenant,
+            bank_transaction=bank_transaction,
+            defaults={
+                "matched_journal": journal,
+                "reconciled_by": username or "practice",
+            },
+        )
+
+    return journal, existing_journal is None
 
 
 @login_required(login_url="/login/")
@@ -387,15 +528,34 @@ def practice_banking_review(request):
         elif status not in valid_statuses:
             messages.error(request, "Choose a valid banking review status.")
         else:
+            username = request.user.get_username() or "practice"
+            posted_journal = None
+            if status == "ReadyToPost":
+                posted_journal, created = _post_unmatched_bank_transaction(bank_transaction, username)
+                status = "Reviewed"
             bank_transaction.review_status = status
             if status == "Unreviewed":
                 bank_transaction.reviewed_at = None
                 bank_transaction.reviewed_by = ""
             else:
                 bank_transaction.reviewed_at = timezone.now()
-                bank_transaction.reviewed_by = request.user.get_username() or "practice"
+                bank_transaction.reviewed_by = username
             bank_transaction.save(update_fields=["review_status", "reviewed_at", "reviewed_by"])
-            messages.success(request, f"Bank line marked {status}.")
+            _record_audit_event(
+                bank_transaction.tenant,
+                "BankReview",
+                username,
+                f"Bank transaction {bank_transaction.id} marked {status}.",
+                {
+                    "bank_transaction_id": bank_transaction.id,
+                    "review_status": status,
+                    "posted_journal_id": posted_journal.id if posted_journal else None,
+                },
+            )
+            if posted_journal:
+                messages.success(request, f"Bank line posted to journal {posted_journal.id} and marked Reviewed.")
+            else:
+                messages.success(request, f"Bank line marked {status}.")
         redirect_url = request.path
         if request.POST.get("company"):
             redirect_url = f"{redirect_url}?company={request.POST.get('company')}"
@@ -455,8 +615,16 @@ def practice_ledger_review(request):
         elif journal.status == "Posted":
             messages.info(request, "Journal is already posted.")
         else:
+            username = request.user.get_username() or "practice"
             journal.status = "Posted"
             journal.save(update_fields=["status"])
+            _record_audit_event(
+                journal.tenant,
+                "LedgerApproval",
+                username,
+                f"Journal {journal.id} approved and marked Posted.",
+                {"journal_id": journal.id, "source_type": journal.source_type},
+            )
             messages.success(request, "Journal approved and marked Posted.")
         redirect_url = request.path
         params = []
@@ -521,15 +689,33 @@ def practice_evidence_review(request):
         elif status not in valid_statuses:
             messages.error(request, "Choose a valid evidence review status.")
         else:
+            username = request.user.get_username() or "practice"
+            journal = None
+            if status == "ReadyForPosting":
+                journal, created = _create_evidence_review_journal(document, username)
             document.review_status = status
             if status == "Unreviewed":
                 document.reviewed_at = None
                 document.reviewed_by = ""
             else:
                 document.reviewed_at = timezone.now()
-                document.reviewed_by = request.user.get_username() or "practice"
+                document.reviewed_by = username
             document.save(update_fields=["review_status", "reviewed_at", "reviewed_by"])
-            messages.success(request, f"Evidence marked {status}.")
+            _record_audit_event(
+                document.tenant,
+                "EvidenceReview",
+                username,
+                f"Evidence document {document.id} marked {status}.",
+                {
+                    "document_id": document.id,
+                    "review_status": status,
+                    "journal_id": journal.id if journal else None,
+                },
+            )
+            if journal:
+                messages.success(request, f"Evidence review journal {journal.id} created and evidence marked {status}.")
+            else:
+                messages.success(request, f"Evidence marked {status}.")
         redirect_url = request.path
         if request.POST.get("company"):
             redirect_url = f"{redirect_url}?company={request.POST.get('company')}"

@@ -10,6 +10,7 @@ from openpyxl import Workbook
 
 from accounting.intake import process_uploaded_file
 from accounting.models import (
+    AuditEvent,
     BankReconciliation,
     BankTransaction,
     ClientRequest,
@@ -190,7 +191,7 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert response.status_code == 200
         assert "Recently uploaded" in body
         assert "receipt-visible.pdf" in body
-        assert "Stored" in body
+        assert "Unreviewed" in body
 
     def test_practice_dashboard_surfaces_client_work_queues(self):
         EvidenceDocument.objects.create(
@@ -435,9 +436,22 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         )
         open_transaction.refresh_from_db()
         assert update_response.status_code == 302
-        assert open_transaction.review_status == "ReadyToPost"
+        assert open_transaction.review_status == "Reviewed"
         assert open_transaction.reviewed_by == "admin"
         assert open_transaction.reviewed_at is not None
+        posted_journal = Journal.objects.get(tenant=self.tenant, source_id="FITID-BANK-OPEN")
+        assert posted_journal.source_type == "BankPayment"
+        assert posted_journal.lines.count() == 2
+        assert BankReconciliation.objects.filter(
+            tenant=self.tenant,
+            bank_transaction=open_transaction,
+            matched_journal=posted_journal,
+        ).exists()
+        assert AuditEvent.objects.filter(
+            tenant=self.tenant,
+            event_type="BankReview",
+            details__bank_transaction_id=open_transaction.id,
+        ).exists()
 
     def test_practice_can_review_filtered_ledger_in_app(self):
         review_journal = Journal.objects.create(
@@ -484,6 +498,11 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         review_journal.refresh_from_db()
         assert approve_response.status_code == 302
         assert review_journal.status == "Posted"
+        assert AuditEvent.objects.filter(
+            tenant=self.tenant,
+            event_type="LedgerApproval",
+            details__journal_id=review_journal.id,
+        ).exists()
 
     def test_practice_can_review_evidence_uploads_in_app(self):
         unlinked_document = EvidenceDocument.objects.create(
@@ -543,6 +562,23 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert unlinked_document.review_status == "ReadyForPosting"
         assert unlinked_document.reviewed_by == "admin"
         assert unlinked_document.reviewed_at is not None
+        evidence_journal = Journal.objects.get(
+            tenant=self.tenant,
+            source_type="EvidenceReview",
+            source_id=f"EVIDENCE-{unlinked_document.id}",
+        )
+        assert evidence_journal.status == "RequiresReview"
+        assert evidence_journal.lines.count() == 2
+        assert JournalEvidenceLink.objects.filter(
+            tenant=self.tenant,
+            journal=evidence_journal,
+            document=unlinked_document,
+        ).exists()
+        assert AuditEvent.objects.filter(
+            tenant=self.tenant,
+            event_type="EvidenceReview",
+            details__document_id=unlinked_document.id,
+        ).exists()
 
     def test_client_question_requires_subject_and_message(self):
         self.client.force_login(self.user)
