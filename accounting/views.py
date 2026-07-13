@@ -368,11 +368,16 @@ def client_portal(request):
     bank_count = 0
     unreconciled_count = 0
     evidence_count = 0
+    unreviewed_evidence_count = 0
     journal_count = 0
+    open_request_count = 0
+    ready_vat_count = 0
+    waiting_vat_count = 0
     latest_documents = []
     latest_journals = []
     vat_returns = []
     client_requests = []
+    action_cards = []
 
     if selected_tenant:
         revenue = JournalLine.objects.filter(
@@ -397,6 +402,11 @@ def client_portal(request):
             .count()
         )
         evidence_count = EvidenceDocument.objects.filter(tenant=selected_tenant).count()
+        unreviewed_evidence_count = (
+            EvidenceDocument.objects.filter(tenant=selected_tenant)
+            .exclude(review_status="ReadyForPosting")
+            .count()
+        )
         journal_count = Journal.objects.filter(tenant=selected_tenant).count()
         latest_documents = EvidenceDocument.objects.filter(
             tenant=selected_tenant
@@ -410,6 +420,48 @@ def client_portal(request):
         client_requests = ClientRequest.objects.filter(
             tenant=selected_tenant
         ).order_by("-submitted_at")[:4]
+        open_request_count = ClientRequest.objects.filter(
+            tenant=selected_tenant
+        ).exclude(status="Resolved").count()
+        ready_vat_count = VatReview.objects.filter(
+            tenant=selected_tenant,
+            status="ClientApproved",
+        ).count()
+        waiting_vat_count = VatReview.objects.filter(
+            tenant=selected_tenant,
+            status="Ready",
+            client_approved=False,
+        ).count()
+        action_cards = [
+            {
+                "title": "Upload outstanding paperwork",
+                "detail": f"{unreviewed_evidence_count} uploaded file(s) are still being reviewed.",
+                "status": "In review" if unreviewed_evidence_count else "Clear",
+                "href": "#upload",
+                "tone": "attention" if unreviewed_evidence_count else "ready",
+            },
+            {
+                "title": "Explain unmatched bank lines",
+                "detail": f"{unreconciled_count} bank transaction(s) still need matching or explanation.",
+                "status": "Needs input" if unreconciled_count else "Matched",
+                "href": "#support",
+                "tone": "attention" if unreconciled_count else "ready",
+            },
+            {
+                "title": "Review VAT approvals",
+                "detail": f"{waiting_vat_count} VAT period(s) are ready for client approval.",
+                "status": "Review" if waiting_vat_count else "None waiting",
+                "href": "client_vat_review",
+                "tone": "attention" if waiting_vat_count else "ready",
+            },
+            {
+                "title": "Read accountant replies",
+                "detail": f"{open_request_count} open question(s) are in the advice queue.",
+                "status": "Open" if open_request_count else "Clear",
+                "href": "#support",
+                "tone": "ready" if not open_request_count else "",
+            },
+        ]
 
     context = {
         "tenants": tenants,
@@ -421,11 +473,16 @@ def client_portal(request):
         "bank_count": bank_count,
         "unreconciled_count": unreconciled_count,
         "evidence_count": evidence_count,
+        "unreviewed_evidence_count": unreviewed_evidence_count,
         "journal_count": journal_count,
+        "open_request_count": open_request_count,
+        "ready_vat_count": ready_vat_count,
+        "waiting_vat_count": waiting_vat_count,
         "latest_documents": latest_documents,
         "latest_journals": latest_journals,
         "vat_returns": vat_returns,
         "client_requests": client_requests,
+        "action_cards": action_cards,
     }
     return render(request, "accounting/client_portal.html", context)
 
@@ -451,6 +508,11 @@ def management_report_view(request, tenant_id):
             "revenue": _money(report["revenue"]),
             "expenses": _money(report["expenses"]),
             "profit": _money(report["profit"]),
+            "cash_balance": _money(report["cash_balance"]),
+            "gross_assets": _money(report["gross_assets"]),
+            "liabilities": _money(report["liabilities"]),
+            "net_assets": _money(report["net_assets"]),
+            "equity": _money(report["equity"]),
             "vat_due": _money(report["vat_due"]),
         },
     )
@@ -877,6 +939,44 @@ def practice_dashboard(request):
         client_approved=True,
         status="ClientApproved",
     ).count()
+    workflow_summary = [
+        {
+            "label": "Client uploads",
+            "count": upload_inbox.count() if hasattr(upload_inbox, "count") else len(upload_inbox),
+            "detail": "New evidence waiting for review",
+            "href": "practice_evidence_review",
+        },
+        {
+            "label": "Bank matching",
+            "count": unreconciled_count,
+            "detail": "Transactions not yet reconciled",
+            "href": "practice_banking_review",
+        },
+        {
+            "label": "Ledger review",
+            "count": Journal.objects.filter(status="RequiresReview").count(),
+            "detail": "Journals requiring accountant approval",
+            "href": "practice_ledger_review",
+        },
+        {
+            "label": "Client questions",
+            "count": open_client_requests_count,
+            "detail": "Open advice or information requests",
+            "href": "practice_clients",
+        },
+        {
+            "label": "VAT client approval",
+            "count": awaiting_client_vat_count,
+            "detail": "VAT reviews waiting on clients",
+            "href": "hmrc_vat_workspace",
+        },
+        {
+            "label": "VAT filing",
+            "count": ready_to_file_vat_count,
+            "detail": "Client-approved VAT reviews ready to file",
+            "href": "hmrc_vat_workspace",
+        },
+    ]
 
     context = {
         "tenants": tenants,
@@ -898,6 +998,7 @@ def practice_dashboard(request):
         "open_client_requests_count": open_client_requests_count,
         "awaiting_client_vat_count": awaiting_client_vat_count,
         "ready_to_file_vat_count": ready_to_file_vat_count,
+        "workflow_summary": workflow_summary,
         "hmrc_status": hmrc_sandbox_status(),
     }
     return render(request, "accounting/dashboard.html", context)

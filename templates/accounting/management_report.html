@@ -66,6 +66,29 @@
             </article>
         </section>
 
+        <section class="client-status-grid" aria-label="Balance sheet summary">
+            <article class="client-status-card ready">
+                <span>Cash balance</span>
+                <strong>{{ cash_balance }}</strong>
+                <small>Cash and bank nominal balance</small>
+            </article>
+            <article class="client-status-card">
+                <span>Gross assets</span>
+                <strong>{{ gross_assets }}</strong>
+                <small>Assets currently recorded</small>
+            </article>
+            <article class="client-status-card">
+                <span>Liabilities</span>
+                <strong>{{ liabilities }}</strong>
+                <small>Creditor, VAT and liability accounts</small>
+            </article>
+            <article class="client-status-card attention">
+                <span>Net assets</span>
+                <strong>{{ net_assets }}</strong>
+                <small>Assets less liabilities</small>
+            </article>
+        </section>
+
         <section class="client-grid">
             <article class="client-panel report-detail-panel">
                 <div class="section-heading">
@@ -86,6 +109,14 @@
                     <div>
                         <span>Evidence documents</span>
                         <strong>{{ report.evidence_count }}</strong>
+                    </div>
+                    <div>
+                        <span>Open questions</span>
+                        <strong>{{ report.open_client_requests }}</strong>
+                    </div>
+                    <div>
+                        <span>Files still in review</span>
+                        <strong>{{ report.unreviewed_evidence }}</strong>
                     </div>
                 </div>
             </article>

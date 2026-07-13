@@ -129,6 +129,16 @@
             </a>
         </section>
 
+        <section class="workflow-summary" aria-label="Practice workflow summary">
+            {% for item in workflow_summary %}
+            <a class="workflow-card" href="{% url item.href %}">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.count }}</strong>
+                <small>{{ item.detail }}</small>
+            </a>
+            {% endfor %}
+        </section>
+
         <section class="content-grid">
             <article class="surface client-surface">
                 <div class="section-heading">

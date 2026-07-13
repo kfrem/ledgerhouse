@@ -73,7 +73,7 @@
             <article class="client-status-card ready">
                 <span>Documents uploaded</span>
                 <strong>{{ evidence_count }}</strong>
-                <small>Receipts, invoices and evidence in the vault</small>
+                <small>{{ unreviewed_evidence_count }} still being reviewed</small>
             </article>
             <article class="client-status-card">
                 <span>Bank activity</span>
@@ -88,8 +88,18 @@
             <article class="client-status-card attention">
                 <span>VAT estimate</span>
                 <strong>{{ vat_due }}</strong>
-                <small><a class="text-link" href="{% url 'client_vat_review' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}">Review VAT approvals</a></small>
+                <small>{{ waiting_vat_count }} approval(s) waiting</small>
             </article>
+        </section>
+
+        <section class="client-action-strip" aria-label="What needs attention">
+            {% for card in action_cards %}
+            <a class="client-action-card {{ card.tone }}" href="{% if card.href == 'client_vat_review' %}{% url 'client_vat_review' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}{% else %}{{ card.href }}{% endif %}">
+                <span>{{ card.status }}</span>
+                <strong>{{ card.title }}</strong>
+                <small>{{ card.detail }}</small>
+            </a>
+            {% endfor %}
         </section>
 
         <section class="client-grid">
@@ -155,29 +165,29 @@
                 <div class="section-heading">
                     <div>
                         <p class="eyebrow">Action needed</p>
-                        <h2>Requests from your accountant</h2>
+                        <h2>What your accounts team is working on</h2>
                     </div>
                 </div>
                 <div class="request-list">
                     <div class="request-item">
                         <span class="request-dot"></span>
                         <div>
-                            <strong>Confirm unmatched bank items</strong>
-                            <small>{{ unreconciled_count }} transactions need explanation or receipt support.</small>
+                            <strong>Reviewing uploaded evidence</strong>
+                            <small>{{ unreviewed_evidence_count }} uploaded file(s) are being checked and prepared for bookkeeping.</small>
                         </div>
                     </div>
                     <div class="request-item">
                         <span class="request-dot gold"></span>
                         <div>
-                            <strong>Upload missing purchase invoices</strong>
-                            <small>Your accountant will use these to complete VAT and management reports.</small>
+                            <strong>Matching bank activity</strong>
+                            <small>{{ unreconciled_count }} transaction(s) are being matched to invoices, receipts or explanations.</small>
                         </div>
                     </div>
                     <div class="request-item muted">
                         <span class="request-dot green"></span>
                         <div>
-                            <strong>Review latest management pack</strong>
-                            <small>Open the in-app report or export it as CSV/PDF from the reports area.</small>
+                            <strong>Preparing reports and advice</strong>
+                            <small>{{ open_request_count }} open question(s) or advice request(s) are in the practice queue.</small>
                         </div>
                     </div>
                 </div>

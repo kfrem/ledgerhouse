@@ -1,9 +1,11 @@
 from decimal import Decimal
 from io import BytesIO
+from io import StringIO
 import zipfile
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.test import Client, TransactionTestCase
@@ -24,6 +26,7 @@ from accounting.models import (
     Tenant,
     TenantUserAccess,
     VatReturn,
+    VatReview,
 )
 from accounting.reports import client_data_export_zip, management_report_csv, management_report_pdf
 
@@ -313,9 +316,43 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Director card purchase" in body
         assert f"/practice/clients/{self.tenant.id}/" in body
         assert "Live controls" in body
+        assert "Practice workflow summary" in body
+        assert "Ledger review" in body
         assert "Client questions: 1 open" in body
         assert "Next build" not in body
         assert "/admin/accounting/clientrequest/" not in body
+
+    def test_client_portal_surfaces_plain_english_action_cards(self):
+        EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="awaiting-review.pdf",
+            file_content=b"%PDF-1.4\n% awaiting review\n",
+            content_type="application/pdf",
+            uploaded_by="client",
+        )
+        VatReview.objects.create(
+            tenant=self.tenant,
+            period_key="26A2",
+            start_date="2026-07-01",
+            end_date="2026-09-30",
+            status="Ready",
+            evidence_complete=True,
+            bank_reconciled=True,
+            vat_codes_reviewed=True,
+            exceptions_resolved=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"/?company={self.tenant.id}")
+        body = response.content.decode()
+
+        assert response.status_code == 200
+        assert "What needs attention" in body
+        assert "Upload outstanding paperwork" in body
+        assert "Explain unmatched bank lines" in body
+        assert "Review VAT approvals" in body
+        assert "What your accounts team is working on" in body
+        assert "1 VAT period(s) are ready for client approval." in body
 
     def test_client_can_send_question_to_practice_workbench(self):
         self.client.force_login(self.user)
@@ -692,6 +729,9 @@ class ClientPortalWorkflowTests(TransactionTestCase):
 
         assert "Demo Client Ltd" in csv_report
         assert "Revenue" in csv_report
+        assert "Cash balance" in csv_report
+        assert "Net assets" in csv_report
+        assert "Open client questions" in csv_report
         assert pdf_report.startswith(b"%PDF")
         with zipfile.ZipFile(BytesIO(export_zip)) as exported:
             names = set(exported.namelist())
@@ -751,5 +791,19 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "LedgerHouse | Management report" in report_body
         assert "Demo Client Ltd" in report_body
         assert "GBP 1,200.00" in report_body
+        assert "Cash balance" in report_body
+        assert "Net assets" in report_body
+        assert "Open questions" in report_body
         assert "FORM-REPORT" in report_body
         assert "board-pack-receipt.pdf" in report_body
+
+    def test_production_readiness_command_reports_local_blockers(self):
+        output = StringIO()
+
+        call_command("check_production_readiness", stdout=output)
+
+        text = output.getvalue()
+        assert "LedgerHouse production readiness" in text
+        assert "DEBUG disabled" in text
+        assert "FIELD_ENCRYPTION_KEY" in text
+        assert "PostgreSQL backend" in text

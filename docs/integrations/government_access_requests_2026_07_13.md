@@ -14,21 +14,17 @@ Progress made:
 - Completed the first organisation-detail answer: Godfred is the responsible individual.
 - Entered organisation/product URL: `https://ledgerhouse.finaccord.pro`.
 
-Current blocker:
+Current status:
 
-- HMRC requires one organisation identity evidence option:
-  - Unique Taxpayer Reference (UTR)
-  - VAT registration number
-  - Corporation Tax UTR
-  - PAYE reference
-  - or a declaration that the UK organisation has none of these
-
-No value was entered for this step because none of those tax identifiers is stored in this project, and selecting "does not have any" for a UK limited company would be a factual declaration that must not be invented.
+- The Corporation Tax UTR was supplied by the user and entered into the HMRC production credentials request.
+- The terms-of-use checklist was completed.
+- The production credentials request was confirmed and sent.
+- HMRC Developer Hub displayed: `We have received your request for production credentials`.
 
 Next action:
 
-- Provide the correct KAFS LIMITED tax identifier, preferably Corporation Tax UTR if the company is applying as a limited company.
-- Then resume the HMRC production credentials checklist.
+- Wait for HMRC to review the production credentials request.
+- When HMRC approves, store the production credentials outside Git and run a controlled production OAuth test before enabling live filing.
 
 ## Companies House Developer Hub
 

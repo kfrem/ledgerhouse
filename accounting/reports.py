@@ -33,6 +33,17 @@ def _sum_lines(tenant, categories, side):
 def management_report_context(tenant):
     revenue = _sum_lines(tenant, ["Revenue"], "credit")
     expenses = _sum_lines(tenant, ["Expense", "Cost of Sales"], "debit")
+    assets = _sum_lines(tenant, ["Asset"], "debit") - _sum_lines(tenant, ["Asset"], "credit")
+    liabilities = _sum_lines(tenant, ["Liability"], "credit") - _sum_lines(tenant, ["Liability"], "debit")
+    equity = _sum_lines(tenant, ["Equity"], "credit") - _sum_lines(tenant, ["Equity"], "debit")
+    cash = (
+        JournalLine.objects.filter(
+            tenant=tenant,
+            account__category="Asset",
+            account__canonical_taxonomy__icontains="Cash",
+        ).aggregate(debits=Sum("debit"), credits=Sum("credit"))
+    )
+    cash_balance = (cash["debits"] or Decimal("0")) - (cash["credits"] or Decimal("0"))
     reconciled_ids = BankReconciliation.objects.filter(tenant=tenant).values("bank_transaction_id")
     bank_count = BankTransaction.objects.filter(tenant=tenant).count()
     unreconciled_count = (
@@ -49,11 +60,18 @@ def management_report_context(tenant):
         "revenue": revenue,
         "expenses": expenses,
         "profit": revenue - expenses,
+        "gross_assets": assets,
+        "liabilities": liabilities,
+        "equity": equity,
+        "net_assets": assets - liabilities,
+        "cash_balance": cash_balance,
         "vat_due": vat_due,
         "bank_count": bank_count,
         "unreconciled_count": unreconciled_count,
         "journal_count": Journal.objects.filter(tenant=tenant).count(),
         "evidence_count": EvidenceDocument.objects.filter(tenant=tenant).count(),
+        "open_client_requests": ClientRequest.objects.filter(tenant=tenant).exclude(status="Resolved").count(),
+        "unreviewed_evidence": EvidenceDocument.objects.filter(tenant=tenant).exclude(review_status="ReadyForPosting").count(),
     }
 
 
@@ -66,11 +84,18 @@ def management_report_csv(tenant):
     writer.writerow(["Revenue", report["revenue"]])
     writer.writerow(["Expenses", report["expenses"]])
     writer.writerow(["Profit", report["profit"]])
+    writer.writerow(["Cash balance", report["cash_balance"]])
+    writer.writerow(["Gross assets", report["gross_assets"]])
+    writer.writerow(["Liabilities", report["liabilities"]])
+    writer.writerow(["Net assets", report["net_assets"]])
+    writer.writerow(["Equity", report["equity"]])
     writer.writerow(["VAT due", report["vat_due"]])
     writer.writerow(["Bank lines", report["bank_count"]])
     writer.writerow(["Unmatched bank lines", report["unreconciled_count"]])
     writer.writerow(["Bookkeeping entries", report["journal_count"]])
     writer.writerow(["Evidence documents", report["evidence_count"]])
+    writer.writerow(["Unreviewed evidence", report["unreviewed_evidence"]])
+    writer.writerow(["Open client questions", report["open_client_requests"]])
     return output.getvalue()
 
 
@@ -89,11 +114,18 @@ def management_report_pdf(tenant):
         ["Revenue", f"GBP {report['revenue']:,.2f}"],
         ["Expenses", f"GBP {report['expenses']:,.2f}"],
         ["Profit", f"GBP {report['profit']:,.2f}"],
+        ["Cash balance", f"GBP {report['cash_balance']:,.2f}"],
+        ["Gross assets", f"GBP {report['gross_assets']:,.2f}"],
+        ["Liabilities", f"GBP {report['liabilities']:,.2f}"],
+        ["Net assets", f"GBP {report['net_assets']:,.2f}"],
+        ["Equity", f"GBP {report['equity']:,.2f}"],
         ["VAT due", f"GBP {report['vat_due']:,.2f}"],
         ["Bank lines", str(report["bank_count"])],
         ["Unmatched bank lines", str(report["unreconciled_count"])],
         ["Bookkeeping entries", str(report["journal_count"])],
         ["Evidence documents", str(report["evidence_count"])],
+        ["Unreviewed evidence", str(report["unreviewed_evidence"])],
+        ["Open client questions", str(report["open_client_requests"])],
     ]
     table = Table(rows, hAlign="LEFT", colWidths=[180, 260])
     table.setStyle(

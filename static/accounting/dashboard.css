@@ -370,6 +370,7 @@ select {
 
 .summary-grid,
 .module-grid,
+.workflow-summary,
 .content-grid {
     display: grid;
     gap: 18px;
@@ -382,6 +383,11 @@ select {
 
 .module-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 18px;
+}
+
+.workflow-summary {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     margin-bottom: 18px;
 }
 
@@ -400,7 +406,9 @@ select {
 
 .metric,
 .surface,
-.module-tile {
+.module-tile,
+.workflow-card,
+.client-action-card {
     border: 1px solid var(--line);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.9);
@@ -460,6 +468,39 @@ select {
 
 .module-tile.ready {
     background: linear-gradient(180deg, #ffffff, #f0f8f5);
+}
+
+.workflow-card {
+    display: grid;
+    gap: 8px;
+    min-height: 134px;
+    padding: 16px;
+    background: linear-gradient(180deg, #ffffff, #f7fbfa);
+}
+
+.workflow-card span,
+.workflow-card small,
+.client-action-card span,
+.client-action-card small {
+    color: var(--muted);
+}
+
+.workflow-card span,
+.client-action-card span {
+    font-size: 0.76rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.workflow-card strong {
+    color: var(--green-dark);
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.workflow-card small,
+.client-action-card small {
+    line-height: 1.4;
 }
 
 .client-list,
@@ -1082,12 +1123,18 @@ select {
 }
 
 .client-status-grid,
+.client-action-strip,
 .client-grid {
     display: grid;
     gap: 18px;
 }
 
 .client-status-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 18px;
+}
+
+.client-action-strip {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     margin-bottom: 18px;
 }
@@ -1123,6 +1170,31 @@ select {
 
 .client-status-card.attention strong {
     color: var(--gold);
+}
+
+.client-action-card {
+    display: grid;
+    gap: 8px;
+    min-height: 142px;
+    padding: 18px;
+    background: #fff;
+}
+
+.client-action-card strong {
+    font-size: 1.08rem;
+}
+
+.client-action-card.ready {
+    background: linear-gradient(180deg, #ffffff, #edf8f4);
+}
+
+.client-action-card.attention {
+    border-color: #e5c98c;
+    background: linear-gradient(180deg, #ffffff, #fff7e8);
+}
+
+.client-action-card.attention span {
+    color: #8a5a12;
 }
 
 .client-grid {
@@ -1549,6 +1621,8 @@ select {
 @media (max-width: 1180px) {
     .summary-grid,
     .module-grid,
+    .workflow-summary,
+    .client-action-strip,
     .client-status-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -1585,6 +1659,8 @@ select {
 
     .summary-grid,
     .module-grid,
+    .workflow-summary,
+    .client-action-strip,
     .client-status-grid,
     .health-grid,
     .login-shell {
