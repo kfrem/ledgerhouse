@@ -44,6 +44,14 @@
             </div>
         </header>
 
+        {% if messages %}
+        <div class="message-list page-messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <section class="summary-grid" aria-label="Client file metrics">
             <article class="metric">
                 <span>Revenue</span>
@@ -107,13 +115,23 @@
                         </div>
                         <div class="queue-list">
                             {% for request_item in client_requests %}
-                            <a class="queue-item" href="/admin/accounting/clientrequest/{{ request_item.id }}/change/">
+                            <div class="queue-item request-triage-item">
                                 <span>
                                     <strong>{{ request_item.subject }}</strong>
                                     <small>{{ request_item.category }} | {{ request_item.status }} | {{ request_item.submitted_at|date:"d M Y H:i" }}</small>
                                 </span>
-                                <em>{{ request_item.priority }}</em>
-                            </a>
+                                <form class="request-triage-form" method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="update_client_request">
+                                    <input type="hidden" name="request_id" value="{{ request_item.id }}">
+                                    <select name="status" aria-label="Question status">
+                                        <option value="Open" {% if request_item.status == "Open" %}selected{% endif %}>Open</option>
+                                        <option value="InProgress" {% if request_item.status == "InProgress" %}selected{% endif %}>In progress</option>
+                                        <option value="Resolved" {% if request_item.status == "Resolved" %}selected{% endif %}>Resolved</option>
+                                    </select>
+                                    <button class="ghost-button" type="submit">Update</button>
+                                </form>
+                            </div>
                             {% empty %}
                             <div class="empty-state">No client questions have been submitted.</div>
                             {% endfor %}

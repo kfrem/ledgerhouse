@@ -1271,6 +1271,31 @@ select {
     padding: 12px;
 }
 
+.request-triage-item {
+    align-items: start;
+}
+
+.request-triage-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 220px;
+}
+
+.request-triage-form select {
+    min-height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 10px;
+    background: #fff;
+    color: var(--ink);
+}
+
+.request-triage-form .ghost-button {
+    min-height: 38px;
+    padding: 0 12px;
+}
+
 .request-item,
 .report-item,
 .activity-item {

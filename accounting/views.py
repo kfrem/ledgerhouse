@@ -249,6 +249,29 @@ def practice_client_detail(request, tenant_id):
     except Tenant.DoesNotExist as exc:
         raise Http404("Company not found") from exc
 
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "update_client_request":
+            request_id = request.POST.get("request_id")
+            status = request.POST.get("status")
+            valid_statuses = {"Open", "InProgress", "Resolved"}
+            client_request = ClientRequest.objects.filter(tenant=tenant, id=request_id).first()
+            if not client_request:
+                messages.error(request, "Client question was not found for this client.")
+            elif status not in valid_statuses:
+                messages.error(request, "Choose a valid client question status.")
+            else:
+                client_request.status = status
+                if status == "Resolved":
+                    client_request.resolved_at = timezone.now()
+                    client_request.resolved_by = request.user.get_username() or "practice"
+                else:
+                    client_request.resolved_at = None
+                    client_request.resolved_by = ""
+                client_request.save(update_fields=["status", "resolved_at", "resolved_by", "updated_at"])
+                messages.success(request, f"Client question marked {status}.")
+        return redirect("practice_client_detail", tenant_id=tenant.id)
+
     report = management_report_context(tenant)
     reconciled_ids = BankReconciliation.objects.filter(tenant=tenant).values("bank_transaction_id")
     unmatched_bank_transactions = (

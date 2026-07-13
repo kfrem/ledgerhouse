@@ -300,6 +300,38 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert f"/reports/{self.tenant.id}/" in body
         assert f"/integrations/hmrc/vat/?company={self.tenant.id}" in body
 
+    def test_practice_can_update_client_question_status_in_app(self):
+        request_item = ClientRequest.objects.create(
+            tenant=self.tenant,
+            subject="Resolve payroll question",
+            category="Payroll",
+            priority="Normal",
+            message="Can this payroll item be closed?",
+            submitted_by="client",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            f"/practice/clients/{self.tenant.id}/",
+            {
+                "action": "update_client_request",
+                "request_id": str(request_item.id),
+                "status": "Resolved",
+            },
+        )
+
+        assert response.status_code == 302
+        request_item.refresh_from_db()
+        assert request_item.status == "Resolved"
+        assert request_item.resolved_by == "admin"
+        assert request_item.resolved_at is not None
+
+        detail_response = self.client.get(f"/practice/clients/{self.tenant.id}/")
+        detail_body = detail_response.content.decode()
+        assert detail_response.status_code == 200
+        assert "Resolve payroll question" in detail_body
+        assert "Resolved" in detail_body
+
     def test_client_question_requires_subject_and_message(self):
         self.client.force_login(self.user)
 
