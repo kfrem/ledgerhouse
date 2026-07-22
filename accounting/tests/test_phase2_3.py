@@ -3,9 +3,9 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 from django.db import connection, transaction, utils
-from accounting.models import Tenant, NominalAccount, BankFeedConnection, VatReturn, Journal, JournalLine, BankTransaction
+from accounting.models import AuditEvent, Tenant, NominalAccount, BankFeedConnection, VatReturn, Journal, JournalLine, BankTransaction
 from accounting.middleware import tenant_context
-from accounting.open_banking import sync_bank_feed
+from accounting.open_banking import bank_feed_provider_status, sync_bank_feed
 from accounting.mtd import serialize_vat_return_9_box, submit_vat_return_to_hmrc
 from accounting.payroll_cis import import_payroll_journal, post_subcontractor_invoice
 from accounting.console import get_firm_dashboard
@@ -76,6 +76,43 @@ class Phase2And3Tests(TestCase):
 
             # Confirm bank transactions created
             self.assertEqual(BankTransaction.objects.filter(tenant=self.tenant_a).count(), 2)
+
+    def test_local_bank_feed_marks_missing_expected_match_for_review(self):
+        with tenant_context(self.tenant_a.id):
+            connection_a = BankFeedConnection.objects.create(
+                tenant=self.tenant_a,
+                bank_name="Local demo bank",
+                account_identifier="LOCAL-991-A",
+                status="Connected",
+                expires_at=timezone.now() + timedelta(days=90),
+                consent_token="local-test-token",
+            )
+
+            imported, reconciled = sync_bank_feed(self.tenant_a, connection_a)
+
+            self.assertEqual((imported, reconciled), (2, 0))
+            missing_match = BankTransaction.objects.get(
+                tenant=self.tenant_a,
+                fitid="FITID-OB-991",
+            )
+            self.assertEqual(missing_match.review_status, "NeedsInfo")
+            event = AuditEvent.objects.get(
+                tenant=self.tenant_a,
+                event_type="BankFeedMatchMissing",
+            )
+            self.assertEqual(event.details["expected_source_id"], "TC-VI-991")
+            sync_event = AuditEvent.objects.get(
+                tenant=self.tenant_a,
+                event_type="BankFeedSync",
+            )
+            self.assertFalse(sync_event.details["is_live_provider"])
+
+    def test_local_bank_feed_status_cannot_be_mistaken_for_live_connection(self):
+        status = bank_feed_provider_status()
+
+        self.assertFalse(status["is_live"])
+        self.assertEqual(status["provider_name"], "Local demonstration feed")
+        self.assertIn("No bank account", status["message"])
 
     def test_bank_consent_token_is_encrypted_in_database_storage(self):
         with tenant_context(self.tenant_a.id):

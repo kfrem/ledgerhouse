@@ -1,14 +1,24 @@
 from datetime import datetime, date
 from decimal import Decimal
 from django.utils import timezone
-from accounting.models import BankFeedConnection, BankTransaction, Journal
+from accounting.models import AuditEvent, BankFeedConnection, BankTransaction, Journal
 from accounting.reconciliation import reconcile_transaction_to_invoice
 
-class MockOpenBankingClient:
-    """Mock client simulating FCA-aggregator APIs (Nordigen / GoCardless)."""
+
+class LocalDemoBankFeedProvider:
+    """Deterministic local bank-feed provider used only for development tests.
+
+    This provider deliberately does not claim to contact a bank or an Open
+    Banking aggregator. A live provider must be configured separately after a
+    provider contract, consent journey and credentials are available.
+    """
+
+    provider_name = "Local demonstration feed"
+    is_live = False
+
     @staticmethod
     def fetch_transactions(account_identifier, since_date):
-        # Generate mock transaction data for testing
+        """Return deterministic synthetic data for a local account identifier."""
         return [
             {
                 "date": "2026-06-25",
@@ -27,7 +37,19 @@ class MockOpenBankingClient:
         ]
 
 
-def sync_bank_feed(tenant, connection):
+def bank_feed_provider_status(connection=None):
+    """Return a non-secret status payload suitable for local operator UI."""
+    return {
+        "provider_name": LocalDemoBankFeedProvider.provider_name,
+        "is_live": LocalDemoBankFeedProvider.is_live,
+        "connection_status": connection.status if connection else "Not configured",
+        "message": (
+            "Local demonstration data only. No bank account has been contacted."
+        ),
+    }
+
+
+def sync_bank_feed(tenant, connection, provider=None):
     """
     Syncs transactions from the bank feed connection.
     Saves them idempotently as BankTransactions and triggers reconciliation.
@@ -48,7 +70,7 @@ def sync_bank_feed(tenant, connection):
             f"on {connection.expires_at:%Y-%m-%d}. Reauthorization is required before syncing."
         )
 
-    client = MockOpenBankingClient()
+    client = provider or LocalDemoBankFeedProvider()
     since_date = connection.last_sync_at.date() if connection.last_sync_at else date(2026, 1, 1)
     
     txs = client.fetch_transactions(connection.account_identifier, since_date)
@@ -94,9 +116,39 @@ def sync_bank_feed(tenant, connection):
                 reconcile_transaction_to_invoice(tenant, bank_tx, invoice_j, "Open Banking Autopost")
                 reconciled_count += 1
             except Journal.DoesNotExist:
-                pass
-                
+                bank_tx.review_status = "NeedsInfo"
+                bank_tx.save(update_fields=["review_status"])
+                AuditEvent.objects.create(
+                    tenant=tenant,
+                    event_type="BankFeedMatchMissing",
+                    username="local-bank-feed",
+                    description=(
+                        f"Bank transaction {bank_tx.id} expected journal source "
+                        f"'{matched_to}', but no journal was found."
+                    ),
+                    details={
+                        "bank_transaction_id": bank_tx.id,
+                        "expected_source_id": matched_to,
+                        "provider": getattr(client, "provider_name", client.__class__.__name__),
+                    },
+                )
+
     connection.last_sync_at = timezone.now()
     connection.save()
+    AuditEvent.objects.create(
+        tenant=tenant,
+        event_type="BankFeedSync",
+        username="local-bank-feed",
+        description=(
+            f"{getattr(client, 'provider_name', client.__class__.__name__)} imported "
+            f"{imported_count} transaction(s); {reconciled_count} reconciled."
+        ),
+        details={
+            "connection_id": connection.id,
+            "imported_count": imported_count,
+            "reconciled_count": reconciled_count,
+            "is_live_provider": bool(getattr(client, "is_live", False)),
+        },
+    )
     
     return imported_count, reconciled_count
