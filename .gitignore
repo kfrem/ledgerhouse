@@ -158,8 +158,10 @@ Thumbs.db
 .docker_volumes/
 docker-compose.override.yml
 
-# Collected static files
-staticfiles/
+# Collected static files. Keep the directory marker because the development
+# Compose bind mount otherwise hides the image-created directory from Django.
+staticfiles/*
+!staticfiles/.gitkeep
 
 # Local database/server backups
 backups/

@@ -45,6 +45,13 @@ def check_connection_not_superuser(app_configs, databases=None, **kwargs):
         conn = connections[alias]
         if conn.vendor != 'postgresql':
             continue
+        database_name = str(conn.settings_dict.get("NAME") or "")
+        if database_name.startswith("test_"):
+            # Django's disposable test database is created by the configured
+            # owner role. The production warning is not actionable there and
+            # would hide useful test output; real runtime connections remain
+            # subject to the warning below.
+            continue
         try:
             with conn.cursor() as cursor:
                 cursor.execute(

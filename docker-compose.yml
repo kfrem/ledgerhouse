@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ledgerhouse_db
       POSTGRES_USER: ledgerhouse_user
-      POSTGRES_PASSWORD: ledgerhouse_secure_pass_123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting LedgerHouse}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -27,12 +27,12 @@ services:
       - "8000:8000"
     environment:
       - DEBUG=True
-      - SECRET_KEY=django-insecure-stage-0-dummy-key-for-local-dev-only-do-not-use-in-prod
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in .env before starting LedgerHouse}
       - ALLOWED_HOSTS=localhost,127.0.0.1,web,host.docker.internal
-      - DATABASE_URL=postgres://ledgerhouse_user:ledgerhouse_secure_pass_123@db:5432/ledgerhouse_db
+      - DATABASE_URL=postgres://${POSTGRES_USER:-ledgerhouse_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting LedgerHouse}@db:5432/${POSTGRES_DB:-ledgerhouse_db}
       - POSTGRES_DB=ledgerhouse_db
       - POSTGRES_USER=ledgerhouse_user
-      - POSTGRES_PASSWORD=ledgerhouse_secure_pass_123
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting LedgerHouse}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
       - HMRC_ENVIRONMENT=${HMRC_ENVIRONMENT:-sandbox}
