@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Payroll journal</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Practice navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}"><span class="brand-mark">LH</span><span><strong>LedgerHouse</strong><small>Payroll control</small></span></a>
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
+            <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a class="active" href="{% url 'practice_payroll_review' %}"><span>03</span> Payroll</a>
+            <a href="{% url 'practice_accounts_department' %}"><span>04</span> Accounts dept</a>
+            <a href="{% url 'practice_ledger_review' %}"><span>05</span> Ledger</a>
+        </nav>
+    </aside>
+    <main class="workspace">
+        <header class="topbar"><div><p class="eyebrow">Practice payroll</p><h1>Payroll journal control</h1></div><div class="topbar-actions"><a class="ghost-button" href="{% url 'practice_dashboard' %}">Portfolio</a><a class="ghost-button" href="{% url 'practice_operations_timeline' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}">Audit trail</a></div></header>
+        {% if messages %}<div class="message-list page-messages">{% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+        <section class="suite-hero"><div><p class="eyebrow">Local posting only</p><h2>Turn a checked payroll export into a balanced journal</h2><p>LedgerHouse validates gross pay, deductions and net wages before it posts. It does not submit RTI, make pension payments or contact HMRC from this screen.</p></div><div class="suite-score"><span>Posted periods</span><strong>{{ summaries|length }}</strong><small>shown for selected client</small></div></section>
+        <section class="surface integration-surface"><div class="section-heading"><div><p class="eyebrow">New payroll period</p><h2>Review and post CSV</h2></div></div>
+            <form class="vat-workspace-grid" method="post" enctype="multipart/form-data">{% csrf_token %}
+                <div class="vat-card"><label for="company">Client</label><select id="company" name="company">{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if selected_tenant and tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>{% endfor %}</select></div>
+                <div class="vat-card"><label for="period_start">Period start</label><input id="period_start" type="date" name="period_start" required><label for="period_end">Period end</label><input id="period_end" type="date" name="period_end" required></div>
+                <div class="vat-card"><label for="payroll_file">Payroll CSV</label><input id="payroll_file" type="file" name="payroll_file" accept=".csv,text/csv" required><small>Required columns: Department, GrossPay, EmployerNI, EmployeeNI, PAYETax and NetWages.</small><button class="solid-button" type="submit">Validate and post</button></div>
+            </form>
+        </section>
+        <section class="surface"><div class="section-heading"><div><p class="eyebrow">Payroll register</p><h2>Posted payroll periods</h2></div></div><div class="suite-table"><div class="suite-row suite-head"><span>Period</span><span>Gross pay</span><span>PAYE and NI</span><span>Journal</span><span>Status</span></div>{% for summary in summaries %}<div class="suite-row"><span>{{ summary.period_start }} to {{ summary.period_end }}</span><span>GBP {{ summary.gross_pay|floatformat:2 }}</span><span>GBP {{ summary.paye|add:summary.employee_ni|add:summary.employer_ni|floatformat:2 }}</span><span>{% if summary.journal_posted %}Posted{% else %}Not posted{% endif %}</span><span>{{ summary.status }}</span></div>{% empty %}<div class="empty-state">No payroll periods have been posted for this client.</div>{% endfor %}</div></section>
+    </main>
+</body>
+</html>

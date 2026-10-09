@@ -1,0 +1,50 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Operations timeline</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Practice navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span><strong>LedgerHouse</strong><small>Practice workspace</small></span>
+        </a>
+        <nav class="nav-list">
+            <a href="{% url 'practice_dashboard' %}"><span>01</span> Portfolio</a>
+            <a href="{% url 'practice_evidence_review' %}?company={{ selected_tenant.id }}"><span>02</span> Evidence</a>
+            <a href="{% url 'practice_banking_review' %}?company={{ selected_tenant.id }}"><span>03</span> Banking</a>
+            <a class="active" href="{% url 'practice_operations_timeline' %}?company={{ selected_tenant.id }}"><span>04</span> Timeline</a>
+        </nav>
+    </aside>
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Practice control history</p>
+                <h1>Operations timeline</h1>
+            </div>
+            <a class="ghost-button" href="{% url 'practice_client_detail' selected_tenant.id %}">Client file</a>
+        </header>
+        {% if messages %}<div class="message-list page-messages">{% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+        <section class="surface">
+            <div class="section-heading"><div><p class="eyebrow">Audit events</p><h2>{{ selected_tenant.name }}</h2></div><small>{{ events|length }} most recent matching events</small></div>
+            <form method="get" class="inline-form-grid" aria-label="Filter operational timeline">
+                <label>Client<select name="company">{% for tenant in tenants %}<option value="{{ tenant.id }}"{% if tenant.id == selected_tenant.id %} selected{% endif %}>{{ tenant.name }}</option>{% endfor %}</select></label>
+                <label>Event<select name="event_type"><option value="">All events</option>{% for type in event_types %}<option value="{{ type }}"{% if type == selected_event_type %} selected{% endif %}>{{ type }}</option>{% endfor %}</select></label>
+                <label>From<input type="date" name="from" value="{{ date_from }}"></label>
+                <label>To<input type="date" name="to" value="{{ date_to }}"></label>
+                <button class="solid-button" type="submit">Apply filters</button>
+            </form>
+            <div class="activity-table">
+                <div class="table-head"><span>Time</span><span>Event</span><span>Performed by</span><span>Detail</span></div>
+                {% for event in events %}
+                <article class="table-row"><span>{{ event.timestamp|date:"d M Y H:i" }}</span><strong>{{ event.event_type }}</strong><span>{{ event.username|default:"System" }}</span><span>{{ event.description }}</span></article>
+                {% empty %}<div class="empty-state">No operational events match these filters.</div>{% endfor %}
+            </div>
+        </section>
+    </main>
+</body>
+</html>

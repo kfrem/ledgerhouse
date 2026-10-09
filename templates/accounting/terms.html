@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Terms and conditions | LedgerHouse</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body class="login-page">
     <main class="login-shell policy-shell">
@@ -24,6 +24,14 @@
             <p>HMRC integrations are used only after customer authorisation. Customers can revoke authorisation through HMRC or request disconnection through LedgerHouse support.</p>
             <p>The service is provided with reasonable care and skill. It does not replace professional judgement, statutory review obligations or final customer approval of filings.</p>
             <p>Customers can request a data export if they move provider. Data deletion requests are handled subject to legal, tax, audit and accounting retention requirements.</p>
+            <h2>Payments and subscriptions</h2>
+            <p>Subscription fees, payment method, billing provider and collection method are agreed with the customer or practice before live charging is enabled. LedgerHouse may support card, Direct Debit or manual bank-transfer collection depending on the active billing setup.</p>
+            <h2>Customer responsibilities</h2>
+            <p>Customers must provide complete records, review requests from the accounts team, approve statutory filings only when they are satisfied, and maintain authority to act for each connected company or tax account.</p>
+            <h2>Support and availability</h2>
+            <p>Support requests should be sent through the in-app questions workflow or to the published support contact. Planned maintenance, security incidents or external API outages may affect availability of filing, lookup or payment features.</p>
+            <h2>Launch status</h2>
+            <p>Some features, including HMRC production filing, Companies House filing and live payment collection, are enabled only after the required external credentials, approvals and legal/commercial checks are complete.</p>
             <p>Contact: <a href="mailto:info@kafs-ltd.com">info@kafs-ltd.com</a></p>
         </section>
     </main>

@@ -1,0 +1,71 @@
+{% load static accounting_extras %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Accounts production</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Practice navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span><span><strong>LedgerHouse</strong><small>Accounts production</small></span>
+        </a>
+        <nav class="nav-list">
+            <a href="{% url 'practice_dashboard' %}"><span>01</span> Practice</a>
+            <a href="{% url 'practice_clients' %}"><span>02</span> Clients</a>
+            <a class="active" href="{% url 'practice_accounts_production' %}"><span>03</span> Production</a>
+            <a href="{% url 'practice_accounts_department' %}"><span>04</span> Accounts dept</a>
+            <a href="{% url 'practice_exception_register' %}"><span>05</span> Exceptions</a>
+        </nav>
+        <section class="sidebar-panel"><p>Production register</p><strong>{{ selected_tenant.name|default:"No client selected" }}</strong><small>Controlled records for reports, approvals, releases and filing readiness.</small></section>
+    </aside>
+    <main class="workspace">
+        <header class="topbar">
+            <div><p class="eyebrow">Practice workspace</p><h1>Accounts production</h1></div>
+            <div class="topbar-actions">
+                {% if selected_tenant %}<a class="ghost-button" href="{% url 'practice_client_detail' selected_tenant.id %}">Client file</a><a class="solid-button" href="{% url 'management_report' selected_tenant.id %}">Open report</a>{% endif %}
+            </div>
+        </header>
+        <section class="surface production-switcher">
+            <form class="inline-form-grid" method="get">
+                <label for="company"><span>Client</span><select id="company" name="company">{% for tenant in tenants %}<option value="{{ tenant.id }}" {% if selected_tenant and tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>{% endfor %}</select></label>
+                <button class="solid-button" type="submit">Open production file</button>
+            </form>
+        </section>
+        {% if production %}
+        <section class="production-hero">
+            <div><p class="eyebrow">{{ production.company.status }} company file</p><h2>{{ production.company.name }}</h2><p>One controlled view of annual accounts, management packs, approvals, delivery history and work still owned by the practice.</p></div>
+            <dl class="company-facts"><div><dt>Company number</dt><dd>{{ production.company.company_number }}</dd></div><div><dt>Latest year end</dt><dd>{{ production.company.year_end|default:"Not recorded" }}</dd></div><div><dt>Accounts profile</dt><dd>{{ production.company.accounts_type }}</dd></div></dl>
+        </section>
+        <section class="summary-grid production-summary" aria-label="Production file metrics">
+            <article class="metric"><span>Annual accounts</span><strong>{{ production.annual_register|length }}</strong><small>Drafts in the controlled register</small></article>
+            <article class="metric"><span>Management packs</span><strong>{{ production.management_register|length }}</strong><small>Reporting periods available</small></article>
+            <article class="metric"><span>Client decisions</span><strong>{{ production.pending_approvals }}</strong><small>Items waiting for approval</small></article>
+            <article class="metric"><span>Open work</span><strong>{{ production.open_tasks|length }}</strong><small>{% if production.owners %}Owned by {{ production.owners|join:", " }}{% else %}No owner recorded{% endif %}</small></article>
+        </section>
+        <section class="surface production-register" aria-labelledby="annual-register-title">
+            <div class="section-heading"><div><p class="eyebrow">Annual accounts</p><h2 id="annual-register-title">Controlled filing register</h2></div><a class="ghost-button" href="{% url 'companies_house_workspace' %}?company={{ selected_tenant.id }}">Filing workspace</a></div>
+            <div class="production-table" role="table" aria-label="Annual accounts register"><div class="production-row production-head" role="row"><span>Reference</span><span>Period</span><span>Type</span><span>Lifecycle</span><span>Client</span><span>Delivery</span></div>{% for row in production.annual_register %}<div class="production-row" role="row"><strong>{{ row.reference }}</strong><span>{{ row.draft.period_start }} to {{ row.draft.period_end }}</span><span>{{ row.draft.accounts_type }}</span><span><b class="status-pill">{{ row.lifecycle }}</b><small>{{ row.source }}</small></span><span>{% if row.approval %}<b class="status-pill {% if row.approval.status == 'Pending' %}warning{% endif %}">{{ row.approval.get_status_display }}</b>{% else %}Not requested{% endif %}</span><span><b class="status-pill {% if row.delivery_status == 'Not submitted' %}warning{% endif %}">{{ row.delivery_status }}</b>{% if row.filing %}<small>Submission {{ row.filing.submission_number|stringformat:"06d" }}</small>{% endif %}</span></div>{% empty %}<div class="empty-state">No statutory accounts draft has been prepared for this client.</div>{% endfor %}</div>
+        </section>
+        <section class="surface production-register" aria-labelledby="management-register-title">
+            <div class="section-heading"><div><p class="eyebrow">Management reporting</p><h2 id="management-register-title">Pack release register</h2></div><a class="ghost-button" href="{% url 'management_report' selected_tenant.id %}">View latest report</a></div>
+            <div class="production-table" role="table" aria-label="Management pack register"><div class="production-row production-head management-row" role="row"><span>Reference</span><span>Period</span><span>Contents</span><span>Lifecycle</span><span>Client decision</span><span>Release history</span></div>{% for row in production.management_register %}<div class="production-row management-row" role="row"><strong>{{ row.reference }}</strong><span>To {{ row.period_end }}</span><span>{% for section in row.sections %}<small>{{ section.section_name }}{% if not forloop.last %} · {% endif %}</small>{% endfor %}</span><span><b class="status-pill">{{ row.lifecycle }}</b></span><span>{% if row.approval %}<b class="status-pill {% if row.approval.status == 'Pending' %}warning{% endif %}">{{ row.approval.get_status_display }}</b>{% else %}Not requested{% endif %}</span><span>{{ row.release_count }} release event{{ row.release_count|pluralize }}</span></div>{% empty %}<div class="empty-state">No management pack section has been prepared for this client.</div>{% endfor %}</div>
+        </section>
+        <section class="surface production-register" aria-labelledby="release-register-title">
+            <div class="section-heading"><div><p class="eyebrow">Client delivery</p><h2 id="release-register-title">Approved packs ready for release</h2></div></div>
+            <div class="stack-list">
+                {% for row in production.release_ready %}
+                    <div class="stack-item"><span><strong>{{ row.reference }}</strong><small>{{ row.approval.title }} has client approval and has not yet been released.</small></span><form class="inline-action-form" method="post">{% csrf_token %}<input type="hidden" name="action" value="release_approval_pack"><input type="hidden" name="company" value="{{ selected_tenant.id }}"><input type="hidden" name="approval_id" value="{{ row.approval.id }}"><button class="mini-button" type="submit">Release pack</button></form></div>
+                {% empty %}<div class="empty-state">No client-approved management packs are awaiting release.</div>{% endfor %}
+            </div>
+        </section>
+        <section class="production-grid">
+            <article class="surface"><div class="section-heading"><div><p class="eyebrow">Workload</p><h2>Open practice work</h2></div><a class="ghost-button" href="{% url 'practice_accounts_department' %}?company={{ selected_tenant.id }}">Work queues</a></div><div class="stack-list">{% for task in production.open_tasks %}<div class="stack-item"><span><strong>{{ task.title }}</strong><small>{{ task.phase }} · {{ task.owner|default:"Unassigned" }} · due {{ task.due_date|default:"not set" }}</small></span><span><b class="status-pill {% if task.priority == 'High' %}warning{% endif %}">{{ task.get_status_display }}</b>{% if task.status == 'Open' %}<form class="inline-action-form" method="post">{% csrf_token %}<input type="hidden" name="action" value="start_task"><input type="hidden" name="company" value="{{ selected_tenant.id }}"><input type="hidden" name="task_id" value="{{ task.id }}"><button class="mini-button secondary" type="submit">Start</button></form>{% elif task.status == 'InProgress' %}<form class="inline-action-form" method="post">{% csrf_token %}<input type="hidden" name="action" value="complete_task"><input type="hidden" name="company" value="{{ selected_tenant.id }}"><input type="hidden" name="task_id" value="{{ task.id }}"><button class="mini-button" type="submit">Complete</button></form>{% endif %}</span></div>{% empty %}<div class="empty-state">No open practice work is recorded.</div>{% endfor %}</div></article>
+            <article class="surface"><div class="section-heading"><div><p class="eyebrow">Audit trail</p><h2>Latest control events</h2></div><a class="ghost-button" href="{% url 'practice_operations_timeline' %}?company={{ selected_tenant.id }}">Full timeline</a></div><div class="stack-list">{% for event in production.latest_events %}<div class="stack-item"><span><strong>{{ event.description }}</strong><small>{{ event.event_type }} · {{ event.username }} · {{ event.timestamp|date:"d M Y H:i" }}</small></span></div>{% empty %}<div class="empty-state">No control events have been recorded.</div>{% endfor %}</div></article>
+        </section>
+        {% else %}<section class="surface empty-state"><h2>No client selected</h2><p>Create or select a client to open their production file.</p></section>{% endif %}
+    </main>
+</body>
+</html>

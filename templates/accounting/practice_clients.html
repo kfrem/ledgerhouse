@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | Clients</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body>
     <aside class="sidebar" aria-label="Practice navigation">
@@ -40,7 +40,8 @@
             </div>
             <div class="topbar-actions">
                 <a class="ghost-button" href="{% url 'practice_dashboard' %}">Portfolio</a>
-                <a class="ghost-button" href="/admin/accounting/tenant/">Admin fallback</a>
+                <a class="ghost-button" href="{% url 'launch_readiness' %}">Launch readiness</a>
+                <a class="ghost-button" href="/admin/accounting/tenant/">System records</a>
             </div>
         </header>
 
@@ -66,12 +67,12 @@
             <article class="metric">
                 <span>Workflows</span>
                 <strong>Portal ready</strong>
-                <small>Upload, reporting, VAT and question queues are enabled</small>
+                <small>Upload, reporting, approvals and question queues are enabled</small>
             </article>
             <article class="metric">
                 <span>Control</span>
                 <strong>Practice-owned</strong>
-                <small>Routine client work stays outside Django admin</small>
+                <small>Routine client work stays inside LedgerHouse screens</small>
             </article>
         </section>
 

@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | Banking review</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body>
     <aside class="sidebar" aria-label="Practice navigation">
@@ -21,7 +21,7 @@
             <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
             <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
             <a class="active" href="{% url 'practice_banking_review' %}"><span>03</span> Banking</a>
-            <a href="{% url 'hmrc_vat_workspace' %}"><span>04</span> VAT workspace</a>
+            <a href="{% url 'hmrc_vat_workspace' %}"><span>04</span> Compliance</a>
         </nav>
 
         <section class="sidebar-panel">
@@ -39,7 +39,7 @@
             </div>
             <div class="topbar-actions">
                 <a class="ghost-button" href="{% url 'practice_dashboard' %}">Portfolio</a>
-                <a class="ghost-button" href="/admin/accounting/banktransaction/">Admin fallback</a>
+                <a class="ghost-button" href="/admin/accounting/banktransaction/">System records</a>
             </div>
         </header>
 
@@ -123,7 +123,14 @@
                 <div class="table-row">
                     <span>{{ transaction.date }}</span>
                     <strong><a class="text-link" href="{% url 'practice_client_detail' transaction.tenant.id %}">{{ transaction.tenant.name }}</a></strong>
-                    <span>{{ transaction.reference }} | {{ transaction.imported_file.filename }}</span>
+                    <span>
+                        {{ transaction.reference }} | {{ transaction.imported_file.filename }}
+                        {% if transaction.suggested_bank_rule %}
+                        <small>Suggested by {{ transaction.suggested_bank_rule.name }} -> account {{ transaction.suggested_account.code }} ({{ transaction.suggested_bank_rule.confidence|floatformat:0 }}%)</small>
+                        {% else %}
+                        <small>No bank rule match yet; use review status or post to default treatment.</small>
+                        {% endif %}
+                    </span>
                     <form class="request-triage-form" method="post">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="update_bank_review">

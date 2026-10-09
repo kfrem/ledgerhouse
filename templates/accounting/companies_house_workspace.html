@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | Companies House</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body>
     <aside class="sidebar" aria-label="Main navigation">
@@ -81,7 +81,60 @@
                     <span>Local key file</span>
                     <strong>{{ companies_house_status.local_key_file }}</strong>
                 </div>
+                <div>
+                    <span>Accounts filing status</span>
+                    <strong>{{ companies_house_status.filing_status }}</strong>
+                </div>
+                <div>
+                    <span>XML Gateway</span>
+                    <strong>{% if companies_house_status.filing_gateway_url %}Configured{% else %}Not configured{% endif %}</strong>
+                </div>
+                <div>
+                    <span>Test flag</span>
+                    <strong>{{ companies_house_status.filing_test_flag|default:"Missing" }}</strong>
+                </div>
+                <div>
+                    <span>Package reference</span>
+                    <strong>{% if companies_house_status.filing_package_reference_present %}Present{% else %}Missing{% endif %}</strong>
+                </div>
+                <div>
+                    <span>Accounts TIS reference</span>
+                    <strong>{{ companies_house_status.accounts_tis_version }}</strong>
+                </div>
+                <div>
+                    <span>Current filing capability</span>
+                    <strong>{% if companies_house_status.filing_enabled %}Test preparation enabled{% else %}Blocked until XML Gateway test credentials are configured{% endif %}</strong>
+                </div>
+                <div>
+                    <span>Production safety lock</span>
+                    <strong>{{ companies_house_status.production_safety_lock }}</strong>
+                </div>
+                <div>
+                    <span>Test gateway send</span>
+                    <strong>{% if companies_house_status.test_send_enabled %}Explicitly enabled{% else %}Locked pending local evidence review{% endif %}</strong>
+                </div>
             </div>
+
+            <div class="config-list">
+                <div class="config-item">
+                    <span>Important filing boundary</span>
+                    <strong>{{ companies_house_status.filing_detail }}</strong>
+                    <small>{{ companies_house_status.production_safety_detail }}</small>
+                </div>
+            </div>
+
+            <div class="config-list">
+                <div class="config-item">
+                    <span>Declared initial filing scope</span>
+                    <strong>{% for scope in initial_filing_scope %}{{ scope.label }}{% if not forloop.last %}; {% endif %}{% endfor %}</strong>
+                    <small>Other accounts types are blocked until separately designed, tested and approved.</small>
+                </div>
+            </div>
+
+            <form class="hero-actions integration-actions" method="post" action="{% url 'companies_house_workspace' %}">
+                {% csrf_token %}
+                <button class="solid-button" type="submit" name="action" value="build_local_scenarios">Build local test scenarios</button>
+            </form>
 
             <form class="vat-workspace-grid" method="get" action="{% url 'companies_house_workspace' %}">
                 <div class="vat-card">
@@ -163,6 +216,166 @@
             </div>
         </section>
         {% endif %}
+
+        {% if snapshot and linked_tenant %}
+        <section class="surface integration-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Accounts filing test</p>
+                    <h2>Prepare Companies House XML Gateway package</h2>
+                </div>
+                {% if companies_house_status.filing_enabled %}
+                <span class="status-pill">Test credentials ready</span>
+                {% else %}
+                <span class="status-pill warning">Needs test credentials</span>
+                {% endif %}
+            </div>
+
+            <form class="vat-workspace-grid" method="post" action="{% url 'companies_house_workspace' %}?company_number={{ company_number }}">
+                {% csrf_token %}
+                <input type="hidden" name="company_number" value="{{ company_number }}">
+                <div class="vat-card">
+                    <label for="statutory_accounts_id">Statutory accounts draft</label>
+                    <select id="statutory_accounts_id" name="statutory_accounts_id">
+                        {% for draft in statutory_drafts %}
+                        <option value="{{ draft.id }}">{{ draft.period_end }} - {{ draft.accounts_type }} - {{ draft.status }}</option>
+                        {% empty %}
+                        <option value="">No statutory accounts drafts found</option>
+                        {% endfor %}
+                    </select>
+                    <small>The package is sendable only after client approval, Ready for filing status and iXBRL readiness.</small>
+                </div>
+                <div class="vat-card">
+                    <label for="company_authentication_code">Company authentication code</label>
+                    <input id="company_authentication_code" name="company_authentication_code" value="TEST12" maxlength="8">
+                    <small>Use a test code for the test service. Live client codes must not be written into reports.</small>
+                </div>
+                <div class="vat-card">
+                    <span>Action</span>
+                    <button class="ghost-button" type="submit" name="action" value="validate_ixbrl" {% if not statutory_drafts %}disabled{% endif %}>Generate and validate iXBRL</button>
+                    <button class="ghost-button" type="submit" name="action" value="assess_filing_gate" {% if not statutory_drafts %}disabled{% endif %}>Assess filing gate</button>
+                    <button class="ghost-button" type="submit" name="action" value="practice_signoff" {% if not statutory_drafts %}disabled{% endif %}>Practice signoff</button>
+                    <button class="solid-button" type="submit" name="action" value="prepare_test_submission" {% if not statutory_drafts %}disabled{% endif %}>Prepare test package</button>
+                    <button class="solid-button" type="submit" name="action" value="send_test_submission" {% if not statutory_drafts or not companies_house_status.test_send_enabled %}disabled{% endif %} title="{% if companies_house_status.test_send_enabled %}Send to the configured test gateway{% else %}Locked until an operator explicitly enables test gateway sending{% endif %}">Send test package</button>
+                </div>
+            </form>
+        </section>
+        {% endif %}
+
+        <section class="surface integration-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Filing controls</p>
+                    <h2>Client approval and practice signoff gates</h2>
+                </div>
+                <span class="status-pill">{{ approval_gates|length }} shown</span>
+            </div>
+
+            <div class="config-list">
+                {% for gate in approval_gates %}
+                <div class="config-item">
+                    <span>{{ gate.tenant.name }} | {{ gate.statutory_accounts.period_end }} | {{ gate.status }}</span>
+                    <strong>{% if gate.practice_signed_off %}Practice signed off by {{ gate.practice_signed_off_by }}{% else %}Awaiting practice signoff{% endif %}</strong>
+                    <small>
+                        Client pack: {{ gate.client_pack_reference|default:"Not linked" }}.
+                        {% if gate.readiness_messages %}Blockers: {{ gate.readiness_messages|join:" " }}{% else %}Readiness checks clear.{% endif %}
+                        Production mode: {% if gate.test_mode_only %}locked to test only{% else %}live enabled{% endif %}.
+                    </small>
+                </div>
+                {% empty %}
+                <div class="config-item">
+                    <span>No filing gates assessed</span>
+                    <strong>Lookup a company, select a statutory accounts draft, then assess the filing gate.</strong>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface integration-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Local test coverage</p>
+                    <h2>Accounts scenarios ready before Companies House review</h2>
+                </div>
+                <span class="status-pill">{{ scenario_summary|length }} scenarios</span>
+            </div>
+
+            <div class="config-list">
+                {% for scenario in scenario_summary %}
+                <div class="config-item">
+                    <span>{{ scenario.slug }} | {{ scenario.accounts_type }} | {{ scenario.status }}</span>
+                    <strong>{{ scenario.company_name }}</strong>
+                    <small>{{ scenario.description }} {% if scenario.ixbrl_ready %}iXBRL ready locally.{% else %}Build local scenarios to validate iXBRL readiness.{% endif %}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface integration-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Submission control</p>
+                    <h2>Recent Companies House filing tests</h2>
+                </div>
+                <span class="status-pill">{{ filing_submissions|length }} shown</span>
+            </div>
+
+            <div class="config-list">
+                {% for row in filing_submission_rows %}
+                {% with submission=row.submission %}
+                <div class="config-item">
+                    <span>{{ submission.submission_number|stringformat:"06d" }} | {{ submission.company_number }} | {{ submission.status }}</span>
+                    <strong>{{ submission.company_name }}</strong>
+                    {% if submission.validation_messages %}
+                    <small>Blocked: {{ submission.validation_messages|join:" " }}</small>
+                    {% else %}
+                    <small>Gateway-ready locally. Polling XML can be generated for this unique submission number.</small>
+                    {% endif %}
+                    {% if submission.status == "Submitted" or submission.status == "Pending" %}
+                    <form method="post" action="{% url 'companies_house_workspace' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="submission_id" value="{{ submission.id }}">
+                        <button class="ghost-button" type="submit" name="action" value="poll_submission">Check status</button>
+                    </form>
+                    {% endif %}
+                    <small>Next action: {{ row.actions|join:" " }}</small>
+                    {% if row.polls %}
+                    <small>Recent polls:
+                        {% for poll in row.polls %}
+                        {{ poll.submission_number|stringformat:"06d" }} {{ poll.status }} at {{ poll.polled_at }}{% if not forloop.last %}; {% endif %}
+                        {% endfor %}
+                    </small>
+                    {% endif %}
+                </div>
+                {% endwith %}
+                {% empty %}
+                <div class="config-item">
+                    <span>No test submissions prepared</span>
+                    <strong>Lookup a company and prepare a package once statutory accounts are ready.</strong>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface integration-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Local completion register</p>
+                    <h2>Twelve Companies House items completed without external approval</h2>
+                </div>
+                <span class="status-pill">{{ next_local_build_items|length }} items</span>
+            </div>
+
+            <div class="config-list">
+                {% for item in next_local_build_items %}
+                <div class="config-item">
+                    <span>{{ item.status }}</span>
+                    <strong>{{ item.item }}</strong>
+                    <small>{{ item.evidence }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
     </main>
 </body>
 </html>

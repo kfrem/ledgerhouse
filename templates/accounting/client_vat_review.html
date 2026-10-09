@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | VAT approval</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body class="client-page">
     <aside class="sidebar client-sidebar" aria-label="Main navigation">

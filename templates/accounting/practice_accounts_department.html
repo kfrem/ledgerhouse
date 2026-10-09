@@ -1,0 +1,473 @@
+{% load static accounting_extras %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Accounts department suite</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Practice navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Accounts suite</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
+            <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a class="active" href="{% url 'practice_accounts_department' %}"><span>03</span> Accounts dept</a>
+            <a href="{% url 'practice_clients' %}"><span>04</span> Clients</a>
+            <a href="{% url 'practice_ledger_review' %}"><span>05</span> Ledger</a>
+            <a href="{% url 'launch_readiness' %}"><span>06</span> Launch</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Local build</p>
+            <strong>{{ selected_tenant.name|default:"No client selected" }}</strong>
+            <small>Sales, purchase, month-end, payroll, tax, statutory, collaboration and filing-readiness records.</small>
+        </section>
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Local accounts department build</p>
+                <h1>Accounts department suite</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'practice_dashboard' %}">Portfolio</a>
+                {% if selected_tenant %}
+                <a class="ghost-button" href="{% url 'practice_client_detail' selected_tenant.id %}">Client file</a>
+                <a class="ghost-button" href="{% url 'download_management_report' selected_tenant.id 'accounts-department-pack' %}">Accounts pack</a>
+                {% endif %}
+                <a class="ghost-button" href="{% url 'download_no_hmrc_completion_pack' %}">No-HMRC handover ZIP</a>
+                <form action="{% url 'logout' %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="solid-button">Sign out</button>
+                </form>
+            </div>
+        </header>
+
+        {% if messages %}
+        <div class="message-list page-messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <section class="suite-hero">
+            <div>
+                <p class="eyebrow">Operating model</p>
+                <h2>Run the client finance office from one place</h2>
+                <p>Use this local workspace to review sales, purchases, credit control, supplier payments, month-end, payroll, tax, statutory accounts, tasks and filing readiness before anything goes live externally.</p>
+            </div>
+            {% if snapshot %}
+            <div class="suite-score">
+                <span>Local coverage</span>
+                <strong>{{ snapshot.passed_count }} / {{ snapshot.total_count }}</strong>
+                <small>working phase records</small>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="surface integration-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Build control</p>
+                    <h2>Refresh local operating records</h2>
+                </div>
+                {% if snapshot %}
+                <span class="status-pill">{{ snapshot.passed_count }} / {{ snapshot.total_count }} phases</span>
+                {% endif %}
+            </div>
+            <form class="vat-workspace-grid" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="build_local_suite">
+                <div class="vat-card">
+                    <label for="company">Client</label>
+                    <select id="company" name="company">
+                        {% for tenant in tenants %}
+                        <option value="{{ tenant.id }}" {% if selected_tenant and tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small>Select the client workspace to inspect or refresh.</small>
+                </div>
+                <div class="vat-card">
+                    <span>Scope</span>
+                    <strong>Phases 1 to 8</strong>
+                    <small>Updates local records only. It does not send live filings, live emails or live payments.</small>
+                </div>
+                <div class="vat-card">
+                    <span>Action</span>
+                    <button class="solid-button" type="submit">Build local suite</button>
+                </div>
+            </form>
+        </section>
+
+        {% if snapshot %}
+        <section class="summary-grid" aria-label="Accounts department metrics">
+            <article class="metric">
+                <span>Sales invoices</span>
+                <strong>{{ snapshot.sales_count }}</strong>
+                <small>{{ snapshot.open_sales_count }} open, {{ sales_balance_display }} outstanding</small>
+            </article>
+            <article class="metric">
+                <span>Purchase bills</span>
+                <strong>{{ snapshot.purchase_count }}</strong>
+                <small>{{ snapshot.open_purchase_count }} open, {{ purchase_balance_display }} payable</small>
+            </article>
+            <article class="metric">
+                <span>Fixed assets NBV</span>
+                <strong>{{ fixed_asset_nbv_display }}</strong>
+                <small>Local asset register balance</small>
+            </article>
+            <article class="metric">
+                <span>Work queue</span>
+                <strong>{{ snapshot.open_task_count }}</strong>
+                <small>{{ snapshot.task_count }} total tasks, {{ snapshot.notification_count }} notification event(s)</small>
+            </article>
+        </section>
+
+        <section class="suite-grid">
+            <article class="surface suite-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Sales ledger</p>
+                        <h2>Debtors and credit control</h2>
+                    </div>
+                    <span class="status-pill">{{ snapshot.open_sales_count }} open</span>
+                </div>
+                <div class="mini-stack">
+                    {% for quote in sales_quotes %}
+                    <div>
+                        <strong>{{ quote.quote_number }} - {{ quote.customer_name }}</strong>
+                        <small>{{ quote.status|human_status }} | expires {{ quote.expiry_date }} | GBP {{ quote.gross_amount|floatformat:2 }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No sales quotes have been prepared locally.</div>
+                    {% endfor %}
+                </div>
+                <div class="suite-table">
+                    <div class="suite-row suite-head action-row">
+                        <span>Invoice</span>
+                        <span>Customer</span>
+                        <span>Due</span>
+                        <span>Balance</span>
+                        <span>Status</span>
+                        <span>Action</span>
+                    </div>
+                    {% for invoice in sales_invoices %}
+                    <div class="suite-row action-row">
+                        <strong data-label="Invoice">{{ invoice.invoice_number }}</strong>
+                        <span data-label="Customer">{{ invoice.customer_name }}</span>
+                        <span data-label="Due">{{ invoice.due_date }}</span>
+                        <span data-label="Balance">GBP {{ invoice.balance_due|floatformat:2 }}</span>
+                        <span data-label="Status" class="status-pill {% if invoice.status == 'Overdue' %}warning{% endif %}">{{ invoice.status|human_status }}</span>
+                        <span data-label="Action">
+                            {% if invoice.balance_due > 0 %}
+                            <form class="inline-action-form" method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="record_invoice_receipt">
+                                <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                                <input type="hidden" name="invoice_id" value="{{ invoice.id }}">
+                                <label class="compact-field">
+                                    <span>Amount received</span>
+                                    <input name="receipt_amount" type="number" min="0.01" step="0.01" max="{{ invoice.balance_due }}" value="{{ invoice.balance_due }}" required>
+                                </label>
+                                <label class="compact-field">
+                                    <span>Bank/receipt reference</span>
+                                    <input name="receipt_reference" maxlength="120" required placeholder="Bank receipt reference">
+                                </label>
+                                <button class="mini-button" type="submit">Record receipt</button>
+                            </form>
+                            {% else %}
+                            <em class="quiet-label">Clear</em>
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No sales invoices have been created locally yet.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="surface suite-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Purchase ledger</p>
+                        <h2>Suppliers and payment runs</h2>
+                    </div>
+                    <span class="status-pill">{{ snapshot.open_purchase_count }} open</span>
+                </div>
+                <div class="mini-stack">
+                    {% for order in purchase_orders %}
+                    <div>
+                        <strong>{{ order.order_number }} - {{ order.supplier_name }}</strong>
+                        <small>{{ order.status|human_status }} | expected {{ order.expected_date|default:"not set" }} | GBP {{ order.gross_amount|floatformat:2 }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No purchase orders have been prepared locally.</div>
+                    {% endfor %}
+                </div>
+                <div class="suite-table">
+                    <div class="suite-row suite-head action-row">
+                        <span>Bill</span>
+                        <span>Supplier</span>
+                        <span>Due</span>
+                        <span>Balance</span>
+                        <span>Status</span>
+                        <span>Action</span>
+                    </div>
+                    {% for bill in purchase_bills %}
+                    <div class="suite-row action-row">
+                        <strong data-label="Bill">{{ bill.bill_number }}</strong>
+                        <span data-label="Supplier">{{ bill.supplier_name }}</span>
+                        <span data-label="Due">{{ bill.due_date }}</span>
+                        <span data-label="Balance">GBP {{ bill.balance_due|floatformat:2 }}</span>
+                        <span data-label="Status" class="status-pill">{{ bill.status|human_status }}</span>
+                        <span data-label="Action">
+                            {% if bill.status == "AwaitingApproval" %}
+                            <form class="inline-action-form" method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_purchase_bill">
+                                <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                                <input type="hidden" name="bill_id" value="{{ bill.id }}">
+                                <button class="mini-button" type="submit">Approve</button>
+                            </form>
+                            {% elif bill.status == "Paid" %}
+                            <em class="quiet-label">Paid</em>
+                            {% else %}
+                            <em class="quiet-label">Ready</em>
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No purchase bills have been created locally yet.</div>
+                    {% endfor %}
+                </div>
+                <div class="mini-stack">
+                    {% for run in payment_runs %}
+                    <div>
+                        <strong>{{ run.run_reference }}</strong>
+                        <small>{{ run.status|human_status }} for GBP {{ run.total_amount|floatformat:2 }} on {{ run.scheduled_date }}</small>
+                        {% if run.status != "Paid" %}
+                        <form class="inline-action-form" method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="mark_payment_run_paid">
+                            <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                            <input type="hidden" name="payment_run_id" value="{{ run.id }}">
+                            <label class="compact-field">
+                                <span>Bank/payment reference</span>
+                                <input name="payment_reference" maxlength="120" required placeholder="Bank confirmation reference">
+                            </label>
+                            <button class="mini-button" type="submit">Confirm payment</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No supplier payment run has been prepared.</div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+
+        <section class="suite-grid">
+            <article class="surface suite-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Month-end</p>
+                        <h2>Close, assets and review sign-off</h2>
+                    </div>
+                    <span class="status-pill">Controlled locally</span>
+                </div>
+                <div class="mini-stack">
+                    {% for close in month_end_closes %}
+                    <div>
+                        <strong>{{ close.period_start }} to {{ close.period_end }}</strong>
+                        <small>{{ close.status|human_status }} | bank {{ close.bank_reconciled|yesno:"done,open" }} | accruals {{ close.accruals_posted|yesno:"done,open" }} | review {{ close.review_signed_off|yesno:"signed,open" }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No month-end close file has been prepared.</div>
+                    {% endfor %}
+                    {% for lock in period_locks %}
+                    <div>
+                        <strong>Period lock to {{ lock.period_end }}</strong>
+                        <small>{{ lock.status|human_status }} by {{ lock.locked_by }} | {{ lock.reason }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No period lock has been recorded.</div>
+                    {% endfor %}
+                    {% for asset in fixed_assets %}
+                    <div>
+                        <strong>{{ asset.asset_name }}</strong>
+                        <small>Cost GBP {{ asset.cost|floatformat:2 }} | depreciation GBP {{ asset.accumulated_depreciation|floatformat:2 }} | NBV GBP {{ asset.net_book_value|floatformat:2 }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No fixed assets are recorded.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="surface suite-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Payroll and tax</p>
+                        <h2>PAYE, CIS and corporation tax</h2>
+                    </div>
+                    <span class="status-pill">Local estimates</span>
+                </div>
+                <div class="mini-stack">
+                    {% for rule in bank_rules %}
+                    <div>
+                        <strong>{{ rule.name }}</strong>
+                        <small>Match "{{ rule.match_text }}" | account {{ rule.account_code }} | {{ rule.confidence|floatformat:0 }}% confidence</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No local bank rules are configured.</div>
+                    {% endfor %}
+                    {% for payroll in payroll_summaries %}
+                    <div>
+                        <strong>Payroll {{ payroll.period_start }} to {{ payroll.period_end }}</strong>
+                        <small>Gross GBP {{ payroll.gross_pay|floatformat:2 }} | PAYE GBP {{ payroll.paye|floatformat:2 }} | employer NI GBP {{ payroll.employer_ni|floatformat:2 }} | {{ payroll.status }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No payroll summary has been posted locally.</div>
+                    {% endfor %}
+                    {% for tax in tax_estimates %}
+                    <div>
+                        <strong>Corporation tax estimate to {{ tax.period_end }}</strong>
+                        <small>Taxable profit GBP {{ tax.taxable_profit|floatformat:2 }} | estimate GBP {{ tax.estimated_tax|floatformat:2 }} | {{ tax.status }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No corporation tax estimate has been prepared.</div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+
+        <section class="suite-grid">
+            <article class="surface suite-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Statutory accounts</p>
+                        <h2>Draft accounts and filing readiness</h2>
+                    </div>
+                    <span class="status-pill warning">iXBRL disabled</span>
+                </div>
+                <div class="mini-stack">
+                    {% for draft in statutory_drafts %}
+                    <div>
+                        <strong>{{ draft.accounts_type }} accounts to {{ draft.period_end }}</strong>
+                        <small>{{ draft.status|human_status }} | balance sheet {{ draft.balance_sheet_ready|yesno:"ready,open" }} | notes {{ draft.notes_ready|yesno:"ready,open" }} | client {{ draft.client_approved|yesno:"approved,open" }} | iXBRL {{ draft.ixbrl_ready|yesno:"ready,not ready" }}</small>
+                        <small>{{ draft.review_note }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No statutory accounts draft has been prepared locally.</div>
+                    {% endfor %}
+                    {% for section in pack_sections %}
+                    <div>
+                        <strong>{{ section.section_name }}</strong>
+                        <small>{{ section.status|human_status }} | owner {{ section.owner|default:"Unassigned" }} | {{ section.commentary }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No management pack commentary has been prepared.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="surface suite-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Collaboration</p>
+                        <h2>Tasks and notification previews</h2>
+                    </div>
+                    <span class="status-pill">{{ snapshot.open_task_count }} open</span>
+                </div>
+                <div class="mini-stack">
+                    {% for rule in document_rules %}
+                    <div>
+                        <strong>{{ rule.name }}</strong>
+                        <small>Keyword "{{ rule.keyword }}" | {{ rule.document_category|human_status }} | account {{ rule.suggested_account_code }} | {{ rule.confidence|floatformat:0 }}% confidence</small>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No document intelligence rules are configured.</div>
+                    {% endfor %}
+                    {% for task in accounting_tasks %}
+                    <div>
+                        <strong>{{ task.title }}</strong>
+                        <small>{{ task.phase }} | {{ task.priority|human_status }} | {{ task.status|human_status }} | owner {{ task.owner|default:"Unassigned" }}</small>
+                        {% if task.status == "Open" %}
+                        <form class="inline-action-form" method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="start_task">
+                            <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                            <button class="mini-button secondary" type="submit">Start task</button>
+                        </form>
+                        {% elif task.status == "InProgress" %}
+                        <form class="inline-action-form" method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="complete_task">
+                            <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                            <button class="mini-button" type="submit">Complete task</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No accounting tasks have been created.</div>
+                    {% endfor %}
+                    {% for notification in notifications %}
+                    <div>
+                        <strong>{{ notification.subject }}</strong>
+                        <small>{{ notification.channel }} to {{ notification.recipient }} | {{ notification.status }}</small>
+                        {% if notification.status != "Sent" %}
+                        <form class="inline-action-form" method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="review_notification_preview">
+                            <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                            <input type="hidden" name="notification_id" value="{{ notification.id }}">
+                            <button class="mini-button secondary" type="submit">Review preview</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No notification events are queued.</div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+
+        <section class="surface accounts-flow-panel" aria-label="Phase completion">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Local phase evidence</p>
+                    <h2>What has working records now</h2>
+                </div>
+                <span class="status-pill">Double-entry foundation retained</span>
+            </div>
+            <div class="accounts-flow-grid">
+                {% for phase in snapshot.phases %}
+                <div class="accounts-flow-step {% if phase.passed %}ready{% else %}attention{% endif %}">
+                    <span>{{ phase.phase }}</span>
+                    <strong>{{ phase.label }}</strong>
+                    <em>{% if phase.passed %}Working locally{% else %}Needs more build{% endif %}</em>
+                    <small>{{ phase.detail }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% else %}
+        <section class="surface">
+            <div class="empty-state">No client is available yet. Create a client first, then return to build the local accounts department suite.</div>
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>

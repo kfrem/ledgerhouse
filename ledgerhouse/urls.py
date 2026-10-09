@@ -2,31 +2,65 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path
 from accounting.views import (
+    accept_invitation,
     client_portal,
     client_vat_review,
     companies_house_workspace,
+    companies_house_accounts_preview,
+    download_no_hmrc_completion_pack,
     download_management_report,
     hmrc_authorise,
     hmrc_callback,
     hmrc_sandbox_status_view,
+    hmrc_services_workspace,
     hmrc_vat_workspace,
+    health_check,
+    launch_readiness,
     management_report_view,
+    practice_accounts_department,
+    practice_accounts_production,
     practice_banking_review,
     practice_client_detail,
     practice_clients,
     practice_dashboard,
     practice_evidence_review,
+    practice_evidence_detail,
+    practice_evidence_file,
+    practice_exception_register,
     practice_ledger_review,
+    practice_operations_timeline,
+    practice_payroll_review,
+    practice_period_end,
     privacy_notice,
     terms_and_conditions,
 )
 
 urlpatterns = [
+    path('healthz/', health_check, name='health_check'),
     path('', client_portal, name='client_portal'),
     path('privacy/', privacy_notice, name='privacy_notice'),
     path('terms/', terms_and_conditions, name='terms_and_conditions'),
+    path('invite/<uuid:invitation_id>/', accept_invitation, name='accept_invitation'),
     path('vat/review/', client_vat_review, name='client_vat_review'),
     path('practice/', practice_dashboard, name='practice_dashboard'),
+    path('practice/launch/', launch_readiness, name='launch_readiness'),
+    path(
+        'practice/accounts-department/',
+        practice_accounts_department,
+        name='practice_accounts_department',
+    ),
+    path(
+        'practice/accounts-production/',
+        practice_accounts_production,
+        name='practice_accounts_production',
+    ),
+    path('practice/payroll/', practice_payroll_review, name='practice_payroll_review'),
+    path('practice/period-end/', practice_period_end, name='practice_period_end'),
+    path(
+        'practice/accounts-department/no-hmrc-pack/',
+        download_no_hmrc_completion_pack,
+        name='download_no_hmrc_completion_pack',
+    ),
     path(
         'practice/banking/',
         practice_banking_review,
@@ -38,9 +72,29 @@ urlpatterns = [
         name='practice_ledger_review',
     ),
     path(
+        'practice/timeline/',
+        practice_operations_timeline,
+        name='practice_operations_timeline',
+    ),
+    path(
+        'practice/exceptions/',
+        practice_exception_register,
+        name='practice_exception_register',
+    ),
+    path(
         'practice/evidence/',
         practice_evidence_review,
         name='practice_evidence_review',
+    ),
+    path(
+        'practice/evidence/<int:document_id>/',
+        practice_evidence_detail,
+        name='practice_evidence_detail',
+    ),
+    path(
+        'practice/evidence/<int:document_id>/file/',
+        practice_evidence_file,
+        name='practice_evidence_file',
     ),
     path(
         'practice/clients/',
@@ -73,9 +127,19 @@ urlpatterns = [
         name='hmrc_vat_workspace',
     ),
     path(
+        'integrations/hmrc/services/',
+        hmrc_services_workspace,
+        name='hmrc_services_workspace',
+    ),
+    path(
         'integrations/companies-house/',
         companies_house_workspace,
         name='companies_house_workspace',
+    ),
+    path(
+        'integrations/companies-house/accounts/<int:draft_id>/preview/',
+        companies_house_accounts_preview,
+        name='companies_house_accounts_preview',
     ),
     path(
         'api/integrations/hmrc/authorise/',

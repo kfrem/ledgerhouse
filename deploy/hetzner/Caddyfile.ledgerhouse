@@ -1,0 +1,6 @@
+# Install as /etc/caddy/Caddyfile once ledgerhouse1.finaccord.pro resolves to
+# the server. Caddy obtains and renews the TLS certificate automatically.
+ledgerhouse1.finaccord.pro {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8000
+}

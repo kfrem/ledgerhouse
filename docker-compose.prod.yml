@@ -38,13 +38,20 @@ services:
              python manage.py check --database default --deploy --fail-level ERROR &&
              gunicorn ledgerhouse.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"
     ports:
-      - "8000:8000"
+      # Caddy is the only public entry point. Keep Gunicorn off the public
+      # interface even if a host firewall rule is changed later.
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # The host directory is ignored by Git. It contains the LedgerHouse-only
+      # Companies House credential file and is mounted read-only at runtime.
+      - ${LEDGERHOUSE_SECRETS_DIR:-./.secrets}:/run/ledgerhouse-secrets:ro
     environment:
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY:?set in .env}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:?set in .env}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-}
       - SECURE_TLS=${SECURE_TLS:-False}
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:?set in .env}
       - POSTGRES_DB=${POSTGRES_DB}
       # The web app connects as the restricted app role once it has been
       # created; falls back to the admin role for the very first boot.
@@ -52,10 +59,46 @@ services:
       - POSTGRES_PASSWORD=${APP_DB_PASSWORD:-${POSTGRES_PASSWORD}}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
+      # LedgerHouse-owned government integration settings. Provider features
+      # remain disabled unless their own credentials and explicit flags are set.
+      - HMRC_ENVIRONMENT=${HMRC_ENVIRONMENT:-sandbox}
+      - HMRC_CLIENT_ID=${HMRC_CLIENT_ID:-}
+      - HMRC_CLIENT_SECRET=${HMRC_CLIENT_SECRET:-}
+      - HMRC_APPLICATION_NAME=${HMRC_APPLICATION_NAME:-LedgerHouse}
+      - HMRC_APPLICATION_OWNER=${HMRC_APPLICATION_OWNER:-}
+      - HMRC_SUBSCRIBED_APIS=${HMRC_SUBSCRIBED_APIS:-}
+      - HMRC_REDIRECT_URI=${HMRC_REDIRECT_URI:-}
+      - HMRC_SCOPES=${HMRC_SCOPES:-read:vat write:vat}
+      - HMRC_API_BASE_URL=${HMRC_API_BASE_URL:-https://test-api.service.hmrc.gov.uk}
+      - HMRC_AUTHORIZE_URL=${HMRC_AUTHORIZE_URL:-https://test-api.service.hmrc.gov.uk/oauth/authorize}
+      - HMRC_TOKEN_URL=${HMRC_TOKEN_URL:-https://test-api.service.hmrc.gov.uk/oauth/token}
+      - HMRC_VENDOR_PUBLIC_IP=${HMRC_VENDOR_PUBLIC_IP:-}
+      - HMRC_VENDOR_VERSION=${HMRC_VENDOR_VERSION:-}
+      - COMPANIES_HOUSE_API_BASE_URL=${COMPANIES_HOUSE_API_BASE_URL:-https://api.company-information.service.gov.uk}
+      - COMPANIES_HOUSE_API_KEY=${COMPANIES_HOUSE_API_KEY:-}
+      - COMPANIES_HOUSE_FILING_CREDENTIALS_FILE=/run/ledgerhouse-secrets/companies_house_ledgerhouse_live.env
+      - COMPANIES_HOUSE_FILING_PRESENTER_ID=${COMPANIES_HOUSE_FILING_PRESENTER_ID:-}
+      - COMPANIES_HOUSE_FILING_AUTHENTICATION_VALUE=${COMPANIES_HOUSE_FILING_AUTHENTICATION_VALUE:-}
+      # Leave this empty unless the deployment explicitly overrides it. The
+      # protected credential file then supplies the filing mode and prevents a
+      # compose default from silently turning live credentials into test mode.
+      - COMPANIES_HOUSE_FILING_TEST_FLAG=${COMPANIES_HOUSE_FILING_TEST_FLAG:-}
+      - COMPANIES_HOUSE_FILING_PACKAGE_REFERENCE=${COMPANIES_HOUSE_FILING_PACKAGE_REFERENCE:-}
+      - COMPANIES_HOUSE_FILING_PRODUCT_KEY=${COMPANIES_HOUSE_FILING_PRODUCT_KEY:-ledgerhouse}
+      - COMPANIES_HOUSE_FILING_SEND_ENABLED=${COMPANIES_HOUSE_FILING_SEND_ENABLED:-False}
+      - COMPANIES_HOUSE_FILING_GATEWAY_URL=${COMPANIES_HOUSE_FILING_GATEWAY_URL:-https://xmlgw.companieshouse.gov.uk/v1-0/xmlgw/Gateway}
+      - COMPANIES_HOUSE_FILING_LIVE_ENABLED=${COMPANIES_HOUSE_FILING_LIVE_ENABLED:-False}
+      - COMPANIES_HOUSE_LIVE_APPROVAL_CONFIRMED=${COMPANIES_HOUSE_LIVE_APPROVAL_CONFIRMED:-False}
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; request = urllib.request.Request('http://127.0.0.1:8000/healthz/', headers={'X-Forwarded-Proto': 'https'}); urllib.request.urlopen(request, timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   postgres_data:

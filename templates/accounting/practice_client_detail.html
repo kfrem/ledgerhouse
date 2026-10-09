@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | Client file</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body>
     <aside class="sidebar" aria-label="Practice navigation">
@@ -20,14 +20,14 @@
         <nav class="nav-list">
             <a href="{% url 'client_portal' %}?company={{ tenant.id }}"><span>01</span> Client portal</a>
             <a class="active" href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
-            <a href="{% url 'hmrc_vat_workspace' %}?company={{ tenant.id }}"><span>03</span> VAT workspace</a>
+            <a href="{% url 'hmrc_vat_workspace' %}?company={{ tenant.id }}"><span>03</span> Compliance</a>
             <a href="{% url 'management_report' tenant.id %}"><span>04</span> Report</a>
         </nav>
 
         <section class="sidebar-panel">
             <p>Client file</p>
             <strong>{{ tenant.name }}</strong>
-            <small>Operational view of uploads, queries, bookkeeping, VAT and management reporting.</small>
+            <small>Operational view of uploads, queries, bookkeeping, reporting and statutory work.</small>
         </section>
     </aside>
 
@@ -40,6 +40,7 @@
             <div class="topbar-actions">
                 <a class="ghost-button" href="{% url 'practice_dashboard' %}">Portfolio</a>
                 <a class="ghost-button" href="{% url 'client_portal' %}?company={{ tenant.id }}">Client view</a>
+                <a class="ghost-button" href="{% url 'practice_accounts_production' %}?company={{ tenant.id }}">Production file</a>
                 <a class="solid-button" href="{% url 'management_report' tenant.id %}">Management report</a>
             </div>
         </header>
@@ -69,7 +70,7 @@
                 <small>Current local management position</small>
             </article>
             <article class="metric">
-                <span>VAT due</span>
+                <span>Compliance due</span>
                 <strong>{{ vat_due }}</strong>
                 <small>{% if hmrc_connection and hmrc_connection.status == "Connected" %}HMRC connected{% else %}HMRC not connected{% endif %}</small>
             </article>
@@ -82,20 +83,197 @@
                 <small>See the same upload, approval and question surfaces the client sees.</small>
             </a>
             <a class="module-tile ready" href="{% url 'hmrc_vat_workspace' %}?company={{ tenant.id }}">
-                <span>VAT</span>
-                <strong>Filing control</strong>
-                <small>Sync obligations, review figures and manage filing approvals.</small>
+                <span>Compliance</span>
+                <strong>Statutory control</strong>
+                <small>Review HMRC obligations, figures and filing approvals when needed.</small>
             </a>
             <a class="module-tile" href="{% url 'management_report' tenant.id %}">
                 <span>Reports</span>
                 <strong>Management pack</strong>
                 <small>View and export the latest client finance pack.</small>
             </a>
+            <a class="module-tile ready" href="{% url 'practice_accounts_production' %}?company={{ tenant.id }}">
+                <span>Production</span>
+                <strong>Accounts register</strong>
+                <small>See annual accounts, packs, approvals, delivery status and owned work together.</small>
+            </a>
             <a class="module-tile" href="/admin/accounting/tenant/{{ tenant.id }}/change/">
                 <span>Data</span>
-                <strong>Admin record</strong>
-                <small>Open the underlying Django admin record for maintenance.</small>
+                <strong>System record</strong>
+                <small>Open the underlying maintenance record only when needed.</small>
             </a>
+        </section>
+
+        <section class="surface accounts-flow-panel" aria-label="Accounts department workflow">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Accounts department workflow</p>
+                    <h2>Client service pipeline</h2>
+                </div>
+                <span class="status-pill">Operational view</span>
+            </div>
+            <div class="accounts-flow-grid">
+                {% for item in accounts_workflow %}
+                {% if item.href == "management_report" %}
+                <a class="accounts-flow-step {{ item.tone }}" href="{% url 'management_report' tenant.id %}">
+                {% elif item.href == "hmrc_vat_workspace" %}
+                <a class="accounts-flow-step {{ item.tone }}" href="{% url item.href %}?company={{ tenant.id }}">
+                {% elif item.href == "practice_clients" %}
+                <a class="accounts-flow-step {{ item.tone }}" href="{% url 'practice_client_detail' tenant.id %}">
+                {% else %}
+                <a class="accounts-flow-step {{ item.tone }}" href="{% url item.href %}?company={{ tenant.id }}">
+                {% endif %}
+                    <span>{{ forloop.counter|stringformat:"02d" }}</span>
+                    <strong>{{ item.label }}</strong>
+                    <em>{{ item.status }}</em>
+                    <small>{{ item.detail }}</small>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface accounts-flow-panel" aria-label="Client account control">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Account control</p>
+                    <h2>Service, billing and integration readiness</h2>
+                </div>
+                <span class="status-pill">Local SaaS controls</span>
+            </div>
+            <div class="operating-grid">
+                <div class="operating-card">
+                    <span>Gross profit</span>
+                    <strong>{{ gross_profit }}</strong>
+                    <small>{{ gross_margin }}% gross margin</small>
+                </div>
+                <div class="operating-card">
+                    <span>Net margin</span>
+                    <strong>{{ net_margin }}%</strong>
+                    <small>After posted costs</small>
+                </div>
+                <div class="operating-card">
+                    <span>Cash runway</span>
+                    <strong>{% if cash_runway_months %}{{ cash_runway_months }} months{% else %}Not enough data{% endif %}</strong>
+                    <small>Based on current local overheads</small>
+                </div>
+            </div>
+            <div class="accounts-flow-grid compact-flow">
+                {% for item in operating_snapshot %}
+                <div class="accounts-flow-step {{ item.tone }}">
+                    <span>{{ forloop.counter|stringformat:"02d" }}</span>
+                    <strong>{{ item.label }}</strong>
+                    <em>{{ item.status }}</em>
+                    <small>{{ item.detail }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="content-grid">
+            <article class="surface">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Client onboarding</p>
+                        <h2>Invitations and access</h2>
+                    </div>
+                    <span class="status-pill">Invite flow</span>
+                </div>
+                <form class="inline-form-grid" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_invitation">
+                    <label>
+                        <span>Email</span>
+                        <input name="email" type="email" placeholder="client@example.com">
+                    </label>
+                    <label>
+                        <span>Role</span>
+                        <select name="role">
+                            <option value="Client">Client</option>
+                            <option value="Practice">Practice</option>
+                        </select>
+                    </label>
+                    <button class="solid-button" type="submit">Prepare invitation</button>
+                </form>
+                <div class="stack-list">
+                    {% for invitation in client_invitations %}
+                    <div class="stack-item">
+                        <span>
+                            <strong>{{ invitation.email }}</strong>
+                            <small>{{ invitation.role }} | invited by {{ invitation.invited_by }} | {{ invitation.invited_at|date:"d M Y H:i" }}</small>
+                            {% if invitation.status == "Pending" %}
+                            <small>Accept link: <a class="text-link" href="{% url 'accept_invitation' invitation.id %}">{% url 'accept_invitation' invitation.id %}</a></small>
+                            {% elif invitation.accepted_by %}
+                            <small>Accepted by {{ invitation.accepted_by }} on {{ invitation.accepted_at|date:"d M Y H:i" }}</small>
+                            {% endif %}
+                        </span>
+                        <span class="status-pill">{{ invitation.status }}</span>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No invitations have been prepared for this client.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <aside class="right-rail">
+                <article class="surface">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">Subscription</p>
+                            <h2>Billing status</h2>
+                        </div>
+                    </div>
+                    <form class="support-form light" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update_subscription">
+                        <label for="plan_name">Plan</label>
+                        <input id="plan_name" name="plan_name" value="{{ subscription.plan_name|default:'Local trial' }}">
+                        <label for="subscription_status">Status</label>
+                        <select id="subscription_status" name="status">
+                            {% for value, label in subscription_status_choices %}
+                            <option value="{{ value }}" {% if subscription.status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <label for="monthly_price">Monthly price</label>
+                        <input id="monthly_price" name="monthly_price" value="{{ subscription.monthly_price|default:'0.00' }}">
+                        <label for="currency">Currency</label>
+                        <input id="currency" name="currency" maxlength="3" value="{{ subscription.currency|default:'GBP' }}">
+                        <label for="billing_provider">Billing provider</label>
+                        <select id="billing_provider" name="billing_provider">
+                            {% for value, label in billing_provider_choices %}
+                            <option value="{{ value }}" {% if subscription.billing_provider == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <label for="collection_method">Collection method</label>
+                        <select id="collection_method" name="collection_method">
+                            {% for value, label in collection_method_choices %}
+                            <option value="{{ value }}" {% if subscription.collection_method == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <label for="provider_customer_id">Provider customer ID</label>
+                        <input id="provider_customer_id" name="provider_customer_id" value="{{ subscription.provider_customer_id }}">
+                        <label for="provider_subscription_id">Provider subscription ID</label>
+                        <input id="provider_subscription_id" name="provider_subscription_id" value="{{ subscription.provider_subscription_id }}">
+                        <label for="next_invoice_date">Next invoice date</label>
+                        <input id="next_invoice_date" name="next_invoice_date" type="date" value="{{ subscription.next_invoice_date|date:'Y-m-d' }}">
+                        <label for="billing_note">Billing note</label>
+                        <textarea id="billing_note" name="billing_note" rows="4">{{ subscription.billing_note }}</textarea>
+                        <button class="solid-button" type="submit">Save billing status</button>
+                    </form>
+                    <div class="billing-actions">
+                        <span class="status-pill">{{ subscription.latest_invoice_status|default:"Not issued" }}</span>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="mark_invoice_sent">
+                            <button class="ghost-button" type="submit">Mark invoice issued</button>
+                        </form>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="record_manual_payment">
+                            <button class="ghost-button" type="submit">Record payment</button>
+                        </form>
+                    </div>
+                </article>
+            </aside>
         </section>
 
         <section class="content-grid">
@@ -145,10 +323,10 @@
                         </div>
                         <div class="queue-list">
                             {% for document in latest_documents %}
-                            <a class="queue-item" href="{% url 'practice_evidence_review' %}?company={{ tenant.id }}">
+                            <a class="queue-item" href="{% url 'practice_evidence_detail' document.id %}">
                                 <span>
                                     <strong>{{ document.filename }}</strong>
-                                    <small>{{ document.uploaded_by }} | {{ document.uploaded_at|date:"d M Y H:i" }}</small>
+                                    <small>{{ document.uploaded_by }} | {{ document.uploaded_at|date:"d M Y H:i" }} | {{ document.document_category }}</small>
                                 </span>
                                 <em>Evidence</em>
                             </a>
@@ -204,10 +382,10 @@
                 <article class="surface compliance-card">
                     <div class="section-heading">
                         <div>
-                            <p class="eyebrow">VAT</p>
-                            <h2>Returns</h2>
+                            <p class="eyebrow">Compliance</p>
+                            <h2>Statutory returns</h2>
                         </div>
-                        <a class="text-link" href="{% url 'hmrc_vat_workspace' %}?company={{ tenant.id }}">Open VAT</a>
+                        <a class="text-link" href="{% url 'hmrc_vat_workspace' %}?company={{ tenant.id }}">Open compliance</a>
                     </div>
                     <div class="stack-list">
                         {% for vat_return in vat_returns %}
@@ -219,7 +397,7 @@
                             <span class="amount">GBP {{ vat_return.net_vat_payable }}</span>
                         </a>
                         {% empty %}
-                        <div class="empty-state">No VAT returns recorded for this client.</div>
+                        <div class="empty-state">No statutory returns recorded for this client.</div>
                         {% endfor %}
                     </div>
                 </article>
@@ -249,6 +427,33 @@
                     </a>
                     {% empty %}
                     <div class="empty-state">No journals have been posted for this client.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="surface activity-surface">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Audit trail</p>
+                        <h2>Recent control events</h2>
+                    </div>
+                </div>
+                <div class="activity-table">
+                    <div class="table-head">
+                        <span>Time</span>
+                        <span>Event</span>
+                        <span>User</span>
+                        <span>Status</span>
+                    </div>
+                    {% for event in audit_events %}
+                    <div class="table-row">
+                        <span>{{ event.timestamp|date:"d M H:i" }}</span>
+                        <strong>{{ event.event_type }}</strong>
+                        <span>{{ event.username }}</span>
+                        <span class="status-pill">Logged</span>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No audit events have been recorded for this client yet.</div>
                     {% endfor %}
                 </div>
             </article>

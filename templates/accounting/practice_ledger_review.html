@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | Ledger review</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body>
     <aside class="sidebar" aria-label="Practice navigation">
@@ -22,7 +22,7 @@
             <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
             <a class="active" href="{% url 'practice_ledger_review' %}"><span>03</span> Ledger</a>
             <a href="{% url 'practice_banking_review' %}"><span>04</span> Banking</a>
-            <a href="{% url 'hmrc_vat_workspace' %}"><span>05</span> VAT workspace</a>
+            <a href="{% url 'hmrc_vat_workspace' %}"><span>05</span> Compliance</a>
         </nav>
 
         <section class="sidebar-panel">
@@ -40,7 +40,7 @@
             </div>
             <div class="topbar-actions">
                 <a class="ghost-button" href="{% url 'practice_dashboard' %}">Portfolio</a>
-                <a class="ghost-button" href="/admin/accounting/journal/">Admin fallback</a>
+                <a class="ghost-button" href="/admin/accounting/journal/">System records</a>
             </div>
         </header>
 

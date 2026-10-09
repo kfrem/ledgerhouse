@@ -6,7 +6,7 @@ from django.db import connection, transaction, utils
 from accounting.models import AuditEvent, Tenant, NominalAccount, BankFeedConnection, VatReturn, Journal, JournalLine, BankTransaction
 from accounting.middleware import tenant_context
 from accounting.open_banking import bank_feed_provider_status, sync_bank_feed
-from accounting.mtd import serialize_vat_return_9_box, submit_vat_return_to_hmrc
+from accounting.mtd import HmrcApiError, serialize_vat_return_9_box, submit_vat_return_to_hmrc
 from accounting.payroll_cis import import_payroll_journal, post_subcontractor_invoice
 from accounting.console import get_firm_dashboard
 
@@ -161,8 +161,8 @@ class Phase2And3Tests(TestCase):
             tenant_b_connections = BankFeedConnection.objects.all()
             self.assertEqual(tenant_b_connections.count(), 0)
 
-    def test_hmrc_mtd_vat_filing(self):
-        """Verify 9-box serialization and submission updates VatReturn status."""
+    def test_hmrc_mtd_vat_legacy_submission_path_fails_closed(self):
+        """Verify 9-box serialization and reject the retired mock filing path."""
         with tenant_context(self.tenant_a.id):
             # Seed Sales Standard Invoice with Output VAT
             j_sales = Journal.objects.create(
@@ -206,16 +206,13 @@ class Phase2And3Tests(TestCase):
                 net_vat_payable=Decimal("10.00")
             )
 
-            # Submit to HMRC
-            response = submit_vat_return_to_hmrc(self.tenant_a, vat_return, period_key="26A1")
-            self.assertEqual(response["status"], "success")
-            self.assertTrue(response["receipt_id"].startswith("HMRC-REC-"))
+            with self.assertRaises(HmrcApiError) as raised:
+                submit_vat_return_to_hmrc(self.tenant_a, vat_return, period_key="26A1")
 
-            # Check status promoted
             vat_return.refresh_from_db()
-            self.assertEqual(vat_return.status, "Submitted")
-            self.assertEqual(vat_return.period_key, "26A1")
-            self.assertIsNotNone(vat_return.hmrc_receipt_id)
+            self.assertEqual(raised.exception.status_code, 503)
+            self.assertEqual(vat_return.status, "Draft")
+            self.assertIsNone(vat_return.hmrc_receipt_id)
 
     def test_payroll_journal_importer(self):
         """Verify payroll CSV parses and generates a balanced double-entry manual journal."""

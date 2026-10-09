@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Privacy notice | LedgerHouse</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body class="login-page">
     <main class="login-shell policy-shell">
@@ -24,6 +24,12 @@
             <p>Data is used to provide the service, support client accounting workflows, prepare reports and interact with HMRC only where authorised by the customer.</p>
             <p>HMRC access uses OAuth authorisation. LedgerHouse does not store customers' HMRC sign-in passwords. Stored HMRC tokens are encrypted at application level.</p>
             <p>Customer data is protected by authentication, tenant access controls, audit records, security headers and production HTTPS. Customers can request export, correction or deletion where legally applicable.</p>
+            <h2>Retention and deletion</h2>
+            <p>Accounting records, uploaded evidence, reports and audit logs are retained for the statutory accounting and tax period, unless a longer contract or legal obligation applies. Deletion requests are reviewed against accounting, tax, audit and fraud-prevention duties before data is removed.</p>
+            <h2>Sub-processors and integrations</h2>
+            <p>Where enabled, LedgerHouse may connect to HMRC, Companies House, payment providers, banking providers or hosting/database services. These services are used only for the purpose of delivering the accounting workflow, reporting, payment collection or compliance features selected by the customer or practice.</p>
+            <h2>Security contact</h2>
+            <p>Security concerns should be sent to <a href="mailto:info@kafs-ltd.com">info@kafs-ltd.com</a> with the subject "LedgerHouse security report". Include the affected page, account, time observed and safe reproduction steps where available.</p>
             <p>Contact: <a href="mailto:info@kafs-ltd.com">info@kafs-ltd.com</a></p>
         </section>
     </main>

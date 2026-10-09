@@ -2,10 +2,49 @@ import csv
 from io import StringIO
 from decimal import Decimal, InvalidOperation
 from django.db import transaction
-from accounting.models import Journal, JournalLine, NominalAccount
+from accounting.models import Journal, JournalLine, NominalAccount, PayrollSummary
 
 # HMRC CIS deduction rates: verified (20%), unverified (30%), gross payment status (0%)
 ALLOWED_CIS_RATES = (Decimal("0.00"), Decimal("0.20"), Decimal("0.30"))
+PAYROLL_COLUMNS = ("Department", "GrossPay", "EmployerNI", "EmployeeNI", "PAYETax", "NetWages")
+
+
+def parse_payroll_csv(csv_content):
+    """Validate a payroll export and return journal rows plus period totals."""
+    reader = csv.DictReader(StringIO(csv_content.strip()))
+    if not reader.fieldnames or any(column not in reader.fieldnames for column in PAYROLL_COLUMNS):
+        raise ValueError("Payroll CSV must include Department, GrossPay, EmployerNI, EmployeeNI, PAYETax and NetWages columns.")
+
+    totals = {"gross_pay": Decimal("0.00"), "employer_ni": Decimal("0.00"), "employee_ni": Decimal("0.00"), "paye": Decimal("0.00"), "net_wages": Decimal("0.00")}
+    rows_data = []
+    # Report data-row numbers, matching the existing payroll import contract
+    # and keeping messages actionable for a user who is looking at records
+    # below the CSV header.
+    for idx, row in enumerate(reader, start=1):
+        if not any((value or "").strip() for value in row.values()):
+            continue
+        department = (row.get("Department") or "General").strip() or "General"
+        try:
+            gross = Decimal(row["GrossPay"])
+            employer_ni = Decimal(row["EmployerNI"])
+            employee_ni = Decimal(row["EmployeeNI"])
+            paye = Decimal(row["PAYETax"])
+            net = Decimal(row["NetWages"])
+        except (InvalidOperation, TypeError) as exc:
+            raise ValueError(f"Payroll CSV row {idx} contains a non-numeric amount.") from exc
+        if min(gross, employer_ni, employee_ni, paye, net) < 0:
+            raise ValueError(f"Payroll CSV row {idx} contains a negative amount.")
+        if gross != paye + employee_ni + net:
+            raise ValueError(f"Payroll CSV row {idx} is inconsistent: GrossPay must equal PAYETax + EmployeeNI + NetWages.")
+        rows_data.append((department, gross, employer_ni, employee_ni, paye, net))
+        totals["gross_pay"] += gross
+        totals["employer_ni"] += employer_ni
+        totals["employee_ni"] += employee_ni
+        totals["paye"] += paye
+        totals["net_wages"] += net
+    if not rows_data:
+        raise ValueError("Payroll CSV does not contain any payroll rows.")
+    return rows_data, totals
 
 
 def get_or_create_nominal(tenant, code, name, category, canonical_taxonomy):
@@ -32,41 +71,9 @@ def import_payroll_journal(tenant, csv_content, date_val, created_by="System"):
     paye_nic_acc = get_or_create_nominal(tenant, "2210", "PAYE & NI Control Account", "Liability", "Tax Liabilities")
     net_salaries_acc = get_or_create_nominal(tenant, "2220", "Net Salaries Control Account", "Liability", "Tax Liabilities")
 
-    f = StringIO(csv_content.strip())
-    reader = csv.DictReader(f)
-    
-    total_paye_nic = Decimal("0.00")
-    total_net_wages = Decimal("0.00")
-    rows_data = []
-
-    for idx, row in enumerate(reader, start=1):
-        dept = row.get("Department", "General")
-        try:
-            gross = Decimal(row.get("GrossPay", "0.00"))
-            emp_ni = Decimal(row.get("EmployerNI", "0.00"))
-            ee_ni = Decimal(row.get("EmployeeNI", "0.00"))
-            paye = Decimal(row.get("PAYETax", "0.00"))
-            net = Decimal(row.get("NetWages", "0.00"))
-        except InvalidOperation:
-            raise ValueError(f"Payroll CSV row {idx} contains a non-numeric amount.")
-
-        if min(gross, emp_ni, ee_ni, paye, net) < 0:
-            raise ValueError(f"Payroll CSV row {idx} contains a negative amount.")
-
-        # The journal only balances if each row is internally consistent:
-        # GrossPay must fully decompose into PAYE + Employee NI + Net Wages.
-        # Validate here so bad files fail with a clear error instead of a
-        # database constraint violation at commit.
-        deductions_plus_net = paye + ee_ni + net
-        if gross != deductions_plus_net:
-            raise ValueError(
-                f"Payroll CSV row {idx} is inconsistent: GrossPay ({gross}) must equal "
-                f"PAYETax + EmployeeNI + NetWages ({deductions_plus_net})."
-            )
-
-        rows_data.append((dept, gross, emp_ni))
-        total_paye_nic += (emp_ni + ee_ni + paye)
-        total_net_wages += net
+    rows_data, totals = parse_payroll_csv(csv_content)
+    total_paye_nic = totals["employer_ni"] + totals["employee_ni"] + totals["paye"]
+    total_net_wages = totals["net_wages"]
 
     with transaction.atomic():
         j = Journal.objects.create(
@@ -78,7 +85,7 @@ def import_payroll_journal(tenant, csv_content, date_val, created_by="System"):
             status="Posted"
         )
         
-        for dept, gross, emp_ni in rows_data:
+        for dept, gross, emp_ni, _ee_ni, _paye, _net in rows_data:
             if gross > 0:
                 JournalLine.objects.create(
                     tenant=tenant,
@@ -123,6 +130,34 @@ def import_payroll_journal(tenant, csv_content, date_val, created_by="System"):
             )
             
     return j
+
+
+def post_payroll_period(tenant, csv_content, period_start, period_end, created_by="System"):
+    """Post one validated payroll export once per accounting period."""
+    if period_start > period_end:
+        raise ValueError("Payroll period start must be on or before the period end.")
+    _rows, totals = parse_payroll_csv(csv_content)
+    with transaction.atomic():
+        summary, created = PayrollSummary.objects.select_for_update().get_or_create(
+            tenant=tenant,
+            period_start=period_start,
+            period_end=period_end,
+            defaults={
+                "gross_pay": totals["gross_pay"], "paye": totals["paye"],
+                "employee_ni": totals["employee_ni"], "employer_ni": totals["employer_ni"],
+            },
+        )
+        if not created and summary.journal_posted:
+            raise ValueError("Payroll for this period has already been posted. Reverse it through the ledger review process before replacing it.")
+        journal = import_payroll_journal(tenant, csv_content, period_end, created_by)
+        summary.gross_pay = totals["gross_pay"]
+        summary.paye = totals["paye"]
+        summary.employee_ni = totals["employee_ni"]
+        summary.employer_ni = totals["employer_ni"]
+        summary.journal_posted = True
+        summary.status = "Posted"
+        summary.save()
+    return summary, journal
 
 
 def post_subcontractor_invoice(tenant, subcontractor_name, gross_amount, cis_rate, date_val, department="General", created_by="System"):

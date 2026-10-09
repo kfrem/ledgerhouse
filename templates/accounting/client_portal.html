@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | Client portal</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body class="client-page">
     <aside class="sidebar client-sidebar" aria-label="Client navigation">
@@ -20,7 +20,7 @@
         <nav class="nav-list">
             <a class="active" href="{% url 'client_portal' %}"><span>01</span> Home</a>
             <a href="#upload"><span>02</span> Upload files</a>
-            <a href="{% url 'client_vat_review' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}"><span>03</span> VAT approval</a>
+            <a href="#approvals"><span>03</span> Approvals</a>
             <a href="#requests"><span>04</span> Requests</a>
             <a href="#reports"><span>05</span> Reports</a>
             <a href="#support"><span>06</span> Ask accountant</a>
@@ -36,8 +36,8 @@
     <main class="workspace client-workspace">
         <header class="topbar client-topbar">
             <div>
-                <p class="eyebrow">Client workspace</p>
-                <h1>Your accounts department</h1>
+                <p class="eyebrow">Your company workspace</p>
+                <h1>Accounts overview</h1>
             </div>
             <div class="topbar-actions">
                 <form action="{% url 'logout' %}" method="post">
@@ -49,9 +49,9 @@
 
         <section class="client-hero">
             <div class="client-hero-copy">
-                <p class="eyebrow">Good afternoon</p>
-                <h2>{{ selected_tenant.name|default:"Your company" }} finance hub</h2>
-                <p>Your job is simple: upload receipts, invoices, bank files and spreadsheets. Your accounts team turns them into bookkeeping, VAT, reports and advice.</p>
+                <p class="eyebrow">Your next step</p>
+                <h2>{{ selected_tenant.name|default:"Your company" }}</h2>
+                <p>Send your receipts, invoices, bank files and spreadsheets. Your accounts team prepares the bookkeeping, reports and filings, and will contact you only when a decision is needed.</p>
                 <div class="hero-actions">
                     <a class="solid-button" href="#upload">Upload documents</a>
                     <a class="ghost-button dark" href="#reports">View reports</a>
@@ -65,7 +65,7 @@
                     {% endfor %}
                 </select>
                 <button class="visually-hidden" type="submit">Change company</button>
-                <small>Demo selector for reviewing the seeded client records.</small>
+                <small>Choose the company account you want to view.</small>
             </form>
         </section>
 
@@ -81,15 +81,52 @@
                 <small>{{ unreconciled_count }} items still being matched</small>
             </article>
             <article class="client-status-card">
-                <span>Bookkeeping entries</span>
+                <span>Entries prepared</span>
                 <strong>{{ journal_count }}</strong>
                 <small>Prepared from your records</small>
             </article>
             <article class="client-status-card attention">
-                <span>VAT estimate</span>
+                <span>Tax and filings</span>
                 <strong>{{ vat_due }}</strong>
-                <small>{{ waiting_vat_count }} approval(s) waiting</small>
+                <small>{{ waiting_vat_count }} statutory approval(s) waiting</small>
             </article>
+        </section>
+
+        <section class="surface accounts-flow-panel" aria-label="Operating health">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Company summary</p>
+                    <h2>Your position at a glance</h2>
+                </div>
+                <span class="status-pill">Current records</span>
+            </div>
+            <div class="operating-grid">
+                <div class="operating-card">
+                    <span>Gross profit</span>
+                    <strong>{{ gross_profit }}</strong>
+                    <small>{{ gross_margin }}% gross margin</small>
+                </div>
+                <div class="operating-card">
+                    <span>Net margin</span>
+                    <strong>{{ net_margin }}%</strong>
+                    <small>After recorded costs</small>
+                </div>
+                <div class="operating-card">
+                    <span>Cash runway</span>
+                    <strong>{% if cash_runway_months %}{{ cash_runway_months }} months{% else %}Not enough data{% endif %}</strong>
+                    <small>Based on current local spending history</small>
+                </div>
+            </div>
+            <div class="accounts-flow-grid compact-flow">
+                {% for item in operating_snapshot %}
+                <div class="accounts-flow-step {{ item.tone }}">
+                    <span>{{ forloop.counter|stringformat:"02d" }}</span>
+                    <strong>{{ item.label }}</strong>
+                    <em>{{ item.status }}</em>
+                    <small>{{ item.detail }}</small>
+                </div>
+                {% endfor %}
+            </div>
         </section>
 
         <section class="client-action-strip" aria-label="What needs attention">
@@ -100,6 +137,45 @@
                 <small>{{ card.detail }}</small>
             </a>
             {% endfor %}
+        </section>
+
+        {% if report.plain_english_summary %}
+        <section class="surface accounts-flow-panel" aria-label="Accountant summary">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Accountant summary</p>
+                    <h2>What the numbers mean</h2>
+                </div>
+                <span class="status-pill">Plain English</span>
+            </div>
+            <div class="mini-stack">
+                {% for summary in report.plain_english_summary %}
+                <div>
+                    <strong>{{ summary }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="accounts-flow-panel" aria-label="Accounts department workflow">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">What happens next</p>
+                    <h2>Progress on your records</h2>
+                </div>
+                <span class="status-pill">Live progress</span>
+            </div>
+            <div class="accounts-flow-grid">
+                {% for item in accounts_workflow %}
+                <a class="accounts-flow-step {{ item.tone }}" href="{{ item.anchor|default:'#reports' }}">
+                    <span>{{ forloop.counter|stringformat:"02d" }}</span>
+                    <strong>{{ item.label }}</strong>
+                    <em>{{ item.status }}</em>
+                    <small>{{ item.detail }}</small>
+                </a>
+                {% endfor %}
+            </div>
         </section>
 
         <section class="client-grid">
@@ -125,7 +201,7 @@
                     <strong>Drop receipts, invoices, photos, PDFs or spreadsheets here</strong>
                     <span>CSV and XLSX bank files are imported into banking. PDFs, photos and other files are stored in the evidence vault.</span>
                     <label class="visually-hidden" for="documents">Choose finance documents to upload</label>
-                    <input id="documents" class="file-input" type="file" name="documents" multiple>
+                    <input id="documents" class="file-input" type="file" name="documents" multiple accept=".pdf,.txt,.csv,.xlsx,.jpg,.jpeg,.png,.webp,.heic,application/pdf,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp,image/heic">
                     <button class="solid-button" type="submit">Upload selected files</button>
                 </form>
                 <div class="upload-types">
@@ -193,6 +269,53 @@
                 </div>
             </article>
 
+            <article id="approvals" class="client-panel reports-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Your approval queue</p>
+                        <h2>Review work before it is final</h2>
+                    </div>
+                    <span class="status-pill">{{ pending_approval_count }} waiting</span>
+                </div>
+                <div class="report-list">
+                    {% for approval in approval_records %}
+                    <div class="report-item">
+                        <span>
+                            <strong>{{ approval.title }}</strong>
+                            <small>{{ approval.approval_type }} | {{ approval.summary }}</small>
+                            {% if approval.decision_note %}
+                            <small>Decision note: {{ approval.decision_note }}</small>
+                            {% endif %}
+                        </span>
+                        {% if approval.status == "Pending" %}
+                        <form class="approval-actions" method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="company" value="{{ selected_tenant.id }}">
+                            <input type="hidden" name="approval_id" value="{{ approval.id }}">
+                            <label class="visually-hidden" for="decision_note_{{ approval.id }}">Decision note</label>
+                            <input id="decision_note_{{ approval.id }}" name="decision_note" maxlength="240" placeholder="Optional note">
+                            <button class="mini-button" type="submit" name="action" value="approve_client_item">Approve</button>
+                            <button class="mini-button secondary" type="submit" name="action" value="reject_client_item">Reject</button>
+                        </form>
+                        {% else %}
+                        <em>{{ approval.status }}</em>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No approval items are waiting. Your accountant will place reports or accounts here when review is needed.</div>
+                    {% endfor %}
+                    <div class="report-item">
+                        <span>
+                            <strong>VAT and tax approvals</strong>
+                            <small>VAT approvals remain available on the statutory review page when a return is prepared.</small>
+                        </span>
+                        <span class="report-actions">
+                            <a href="{% url 'client_vat_review' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}">Open VAT review</a>
+                        </span>
+                    </div>
+                </div>
+            </article>
+
             <article class="client-panel business-health">
                 <div class="section-heading">
                     <div>
@@ -216,6 +339,30 @@
                 </div>
             </article>
 
+            <article class="client-panel accounts-health-plan">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Accounts health plan</p>
+                        <h2>What needs to happen next</h2>
+                    </div>
+                    <span class="status-pill">Client view</span>
+                </div>
+                <div class="health-plan-list">
+                    {% for item in accounts_health_plan %}
+                    <a class="health-plan-item {{ item.tone }}" href="{{ item.href }}">
+                        <span>
+                            <strong>{{ item.label }}</strong>
+                            <small>{{ item.detail }}</small>
+                        </span>
+                        <em>{{ item.status }}</em>
+                        <small class="next-action">Next best action: {{ item.next_action }}</small>
+                    </a>
+                    {% empty %}
+                    <div class="empty-state">Once records are uploaded, LedgerHouse will show the next accounts actions here.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
             <article id="reports" class="client-panel reports-panel">
                 <div class="section-heading">
                     <div>
@@ -227,7 +374,7 @@
                     {% for vat_return in vat_returns %}
                     <div class="report-item">
                         <span>
-                            <strong>VAT summary</strong>
+                            <strong>Statutory return summary</strong>
                             <small>{{ vat_return.start_date }} to {{ vat_return.end_date }}</small>
                         </span>
                         <em>{{ vat_return.status }}</em>
@@ -235,8 +382,8 @@
                     {% empty %}
                     <div class="report-item">
                         <span>
-                            <strong>VAT filing history</strong>
-                            <small>Submitted VAT summaries will appear here after filing.</small>
+                            <strong>Filing history</strong>
+                            <small>Submitted statutory summaries will appear here after filing.</small>
                         </span>
                         <em>None yet</em>
                     </div>
@@ -251,6 +398,7 @@
                             <a href="{% url 'management_report' selected_tenant.id %}">View</a>
                             <a href="{% url 'download_management_report' selected_tenant.id 'csv' %}">CSV</a>
                             <a href="{% url 'download_management_report' selected_tenant.id 'pdf' %}">PDF</a>
+                            <a href="{% url 'download_management_report' selected_tenant.id 'pack' %}">Pack</a>
                             <a href="{% url 'download_management_report' selected_tenant.id 'zip' %}">Data export</a>
                         </span>
                         {% else %}

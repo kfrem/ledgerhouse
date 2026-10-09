@@ -1,0 +1,235 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | HMRC filing services</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span><strong>LedgerHouse</strong><small>Finaccord Pro</small></span>
+        </a>
+        <nav class="nav-list">
+            <a href="{% url 'practice_dashboard' %}">Practice</a>
+            <a href="{% url 'practice_accounts_department' %}">Accounts department</a>
+            <a href="{% url 'hmrc_vat_workspace' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}">VAT workspace</a>
+            <a class="active" href="{% url 'hmrc_services_workspace' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}">HMRC services</a>
+        </nav>
+        <section class="sidebar-panel">
+            <p>Submission control</p>
+            <strong>Fail closed</strong>
+            <small>Live filing remains locked until each HMRC service is separately approved and verified.</small>
+        </section>
+
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Tax filing control</p>
+                <h1>HMRC service readiness</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'hmrc_sandbox_status' %}">Sandbox status</a>
+                <form action="{% url 'logout' %}" method="post">
+                    {% csrf_token %}
+                    <button class="solid-button" type="submit">Sign out</button>
+                </form>
+            </div>
+        </header>
+
+        {% if messages %}
+        <div class="message-list">
+            {% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}
+        </div>
+        {% endif %}
+
+        <section class="workday-header">
+            <div>
+                <p class="eyebrow">Selected client</p>
+                <h2>{% if selected_tenant %}{{ selected_tenant.name }}{% else %}Choose a client{% endif %}</h2>
+                <p>Prepare and validate filing data locally. HMRC submission is a separate controlled step after service approval, credentials and client authority.</p>
+            </div>
+            <form method="get" class="company-switcher">
+                <label for="company">Client</label>
+                <select id="company" name="company" onchange="this.form.submit()">
+                    <option value="">Choose a client</option>
+                    {% for tenant in tenants %}
+                    <option value="{{ tenant.id }}" {% if selected_tenant and tenant.id == selected_tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </section>
+
+        {% if selected_tenant %}
+        <section class="surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Client tax identity</p>
+                    <h2>Encrypted HMRC references</h2>
+                    <p>Enter only the references you are authorised to use. Existing values are never displayed in the browser.</p>
+                </div>
+            </div>
+            <form method="post" class="hmrc-profile-form" autocomplete="off">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_tax_profile">
+                <label>Corporation Tax UTR<input type="password" name="corporation_tax_utr" inputmode="numeric" placeholder="{% if tax_profile.corporation_tax_utr %}Recorded - enter to replace{% else %}10 digits{% endif %}"></label>
+                <label>Company number<input type="text" name="company_number" maxlength="8" placeholder="{% if tax_profile.company_number %}Recorded - enter to replace{% else %}8 characters{% endif %}"></label>
+                <label>PAYE reference<input type="password" name="paye_reference" placeholder="{% if tax_profile.paye_reference %}Recorded - enter to replace{% else %}Employer PAYE reference{% endif %}"></label>
+                <label>Accounts Office reference<input type="password" name="accounts_office_reference" placeholder="{% if tax_profile.accounts_office_reference %}Recorded - enter to replace{% else %}Accounts Office reference{% endif %}"></label>
+                <label>CIS UTR<input type="password" name="cis_utr" inputmode="numeric" placeholder="{% if tax_profile.cis_utr %}Recorded - enter to replace{% else %}10 digits{% endif %}"></label>
+                <label>Self Assessment UTR<input type="password" name="self_assessment_utr" inputmode="numeric" placeholder="{% if tax_profile.self_assessment_utr %}Recorded - enter to replace{% else %}10 digits{% endif %}"></label>
+                <label>National Insurance number<input type="password" name="national_insurance_number" placeholder="{% if tax_profile.national_insurance_number %}Recorded - enter to replace{% else %}Taxpayer NINO{% endif %}"></label>
+                <label>Income Tax business ID<input type="password" name="income_tax_business_id" placeholder="{% if tax_profile.income_tax_business_id %}Recorded - enter to replace{% else %}HMRC business ID{% endif %}"></label>
+                <button class="solid-button" type="submit">Update secure references</button>
+            </form>
+        </section>
+        {% endif %}
+
+        <section class="surface priority-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Product approvals</p>
+                    <h2>Services LedgerHouse intends to support</h2>
+                </div>
+            </div>
+            <div class="hmrc-service-table">
+                <div class="hmrc-service-row hmrc-service-head">
+                    <span>Service</span><span>Route</span><span>Filing types</span><span>Status</span>
+                </div>
+                {% for row in service_rows %}
+                <div class="hmrc-service-row">
+                    <span>
+                        <strong>{{ row.definition.name }}</strong>
+                        <small>{{ row.definition.description }}</small>
+                        <a href="{{ row.definition.documentation_url }}" target="_blank" rel="noopener">HMRC documentation</a>
+                    </span>
+                    <span>{{ row.approval.get_transport_display }}</span>
+                    <span>{{ row.definition.filing_types|join:", " }}</span>
+                    <span class="status-pill {% if row.approval.live_ready %}success{% elif row.approval.status == 'CredentialsRequested' %}warning{% endif %}">{{ row.approval.get_status_display }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Income Tax MTD</p>
+                    <h2>Required API coverage</h2>
+                    <p>LedgerHouse must test every required in-year and end-of-year API before HMRC can enable production access.</p>
+                </div>
+            </div>
+            <div class="hmrc-service-table">
+                <div class="hmrc-service-row hmrc-service-head">
+                    <span>API</span><span>Version</span><span>Journey</span><span>Subscription</span>
+                </div>
+                {% for api in income_tax_api_requirements %}
+                <div class="hmrc-service-row">
+                    <span><strong>{{ api.name }}</strong>{% if not api.required %}<small>Only needed when this product route is supported</small>{% endif %}</span>
+                    <span>{{ api.version }}</span>
+                    <span>{{ api.stage }}</span>
+                    <span class="status-pill {% if api.subscribed %}success{% elif api.required %}warning{% endif %}">{% if api.subscribed %}Subscribed{% elif api.required %}Required{% else %}Optional{% endif %}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface priority-surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Local preparation</p>
+                    <h2>Build filing evidence from accounting records</h2>
+                </div>
+            </div>
+            {% if selected_tenant %}
+            <div class="hmrc-action-row">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="prepare_ct600">
+                    <button class="solid-button" type="submit">Prepare CT600 preflight</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="prepare_fps">
+                    <button class="ghost-button" type="submit">Prepare PAYE FPS preflight</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="prepare_eps">
+                    <button class="ghost-button" type="submit">Prepare PAYE EPS draft</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="prepare_cis">
+                    <button class="ghost-button" type="submit">Prepare CIS return draft</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="prepare_itsa">
+                    <button class="ghost-button" type="submit">Prepare Income Tax MTD draft</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="prepare_itsa_annual">
+                    <button class="ghost-button" type="submit">Prepare Income Tax annual draft</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="prepare_sa100">
+                    <button class="ghost-button" type="submit">Prepare SA100 draft</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="prepare_sa800">
+                    <button class="ghost-button" type="submit">Prepare SA800 draft</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="prepare_sa900">
+                    <button class="ghost-button" type="submit">Prepare SA900 draft</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="empty-state">Choose a client to prepare a filing case.</p>
+            {% endif %}
+        </section>
+
+        <section class="surface">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Preflight queue</p>
+                    <h2>Prepared filing cases</h2>
+                </div>
+            </div>
+            <div class="hmrc-case-list">
+                {% for case in filing_cases %}
+                <article class="hmrc-case-row">
+                    <div>
+                        <strong>{{ case.get_service_display }} · {{ case.filing_type }}</strong>
+                        <small>{{ case.period_start }} to {{ case.period_end }}</small>
+                    </div>
+                    <span class="status-pill {% if case.status == 'ValidationFailed' %}warning{% endif %}">{{ case.get_status_display }}</span>
+                    <div class="hmrc-case-findings">
+                        {% for error in case.validation_errors %}<small class="finding-error">{{ error }}</small>{% endfor %}
+                        {% if not case.validation_errors %}<small>No local validation blockers.</small>{% endif %}
+                    </div>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="run_preflight">
+                        <input type="hidden" name="case_id" value="{{ case.id }}">
+                        <button class="ghost-button" type="submit">Run preflight</button>
+                    </form>
+                </article>
+                {% empty %}
+                <p class="empty-state">No filing cases have been prepared for this client.</p>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+</body>
+</html>

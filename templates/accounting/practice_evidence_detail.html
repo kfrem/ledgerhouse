@@ -1,0 +1,177 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Evidence detail</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Practice navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Evidence viewer</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'practice_dashboard' %}"><span>01</span> Practice</a>
+            <a class="active" href="{% url 'practice_evidence_review' %}?company={{ document.tenant.id }}"><span>02</span> Evidence</a>
+            <a href="{% url 'practice_client_detail' document.tenant.id %}"><span>03</span> Client file</a>
+            <a href="{% url 'practice_ledger_review' %}?company={{ document.tenant.id }}"><span>04</span> Ledger</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Evidence</p>
+            <strong>{{ document.tenant.name }}</strong>
+            <small>Review the source file, categorisation, linked journals and audit trail.</small>
+        </section>
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Evidence detail</p>
+                <h1>{{ document.filename }}</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'practice_evidence_review' %}?company={{ document.tenant.id }}">Evidence queue</a>
+                <a class="ghost-button" href="{% url 'practice_evidence_file' document.id %}?download=1">Download</a>
+                <a class="solid-button" href="{% url 'practice_client_detail' document.tenant.id %}">Client file</a>
+            </div>
+        </header>
+
+        {% if messages %}
+        <div class="message-list page-messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <section class="summary-grid" aria-label="Evidence metadata">
+            <article class="metric">
+                <span>Status</span>
+                <strong>{{ document.review_status }}</strong>
+                <small>Reviewed by {{ document.reviewed_by|default:"not yet reviewed" }}</small>
+            </article>
+            <article class="metric">
+                <span>Category</span>
+                <strong>{{ document.document_category }}</strong>
+                <small>{{ document.supplier_or_customer|default:"No supplier/customer captured" }}</small>
+            </article>
+            <article class="metric">
+                <span>Gross amount</span>
+                <strong>{% if document.gross_amount %}GBP {{ document.gross_amount }}{% else %}Not captured{% endif %}</strong>
+                <small>VAT {% if document.vat_amount %}GBP {{ document.vat_amount }}{% else %}not captured{% endif %}</small>
+            </article>
+            <article class="metric">
+                <span>Suggested account</span>
+                <strong>{{ document.suggested_account_code|default:"None" }}</strong>
+                <small>{{ document.document_date|default:"No document date" }}</small>
+            </article>
+        </section>
+
+        <section class="surface evidence-actions-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Document intelligence</p>
+                    <h2>Turn evidence into bookkeeping</h2>
+                </div>
+                <span class="status-pill">Local analysis</span>
+            </div>
+            <div class="billing-actions">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="analyse_evidence">
+                    <button class="ghost-button" type="submit">Analyse document</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="post_evidence_journal">
+                    <button class="solid-button" type="submit">Create review journal</button>
+                </form>
+            </div>
+        </section>
+
+        <section class="content-grid">
+            <article class="surface evidence-viewer">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Source file</p>
+                        <h2>Preview</h2>
+                    </div>
+                    <span class="status-pill">{{ document.content_type }}</span>
+                </div>
+                {% if is_pdf %}
+                <iframe title="Evidence PDF preview" src="{% url 'practice_evidence_file' document.id %}"></iframe>
+                {% elif is_image %}
+                <img src="{% url 'practice_evidence_file' document.id %}" alt="Evidence image preview for {{ document.filename }}">
+                {% else %}
+                <div class="empty-state">
+                    This file type cannot be previewed directly in the browser. Download it to inspect the source file.
+                </div>
+                {% endif %}
+            </article>
+
+            <aside class="right-rail">
+                <article class="surface">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">Review note</p>
+                            <h2>Accountant notes</h2>
+                        </div>
+                    </div>
+                    <p>{{ document.review_note|default:"No review note has been recorded yet." }}</p>
+                </article>
+
+                <article class="surface">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">Linked postings</p>
+                            <h2>Journals</h2>
+                        </div>
+                    </div>
+                    <div class="stack-list">
+                        {% for journal in linked_journals %}
+                        <a class="stack-item" href="{% url 'practice_ledger_review' %}?company={{ document.tenant.id }}">
+                            <span>
+                                <strong>{{ journal.description }}</strong>
+                                <small>{{ journal.date }} | {{ journal.source_type }}</small>
+                            </span>
+                            <span class="status-pill">{{ journal.status }}</span>
+                        </a>
+                        {% empty %}
+                        <div class="empty-state">No journals are linked to this evidence yet.</div>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                <article class="surface">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">Audit trail</p>
+                            <h2>Evidence events</h2>
+                        </div>
+                    </div>
+                    <div class="stack-list">
+                        {% for event in audit_events %}
+                        <div class="stack-item">
+                            <span>
+                                <strong>{{ event.event_type }}</strong>
+                                <small>{{ event.timestamp|date:"d M Y H:i" }} | {{ event.username }}</small>
+                            </span>
+                        </div>
+                        {% empty %}
+                        <div class="empty-state">No audit events have been recorded for this evidence yet.</div>
+                        {% endfor %}
+                    </div>
+                </article>
+            </aside>
+        </section>
+    </main>
+</body>
+</html>

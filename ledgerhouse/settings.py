@@ -49,15 +49,21 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'accounting.middleware.TenantMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'accounting.security.SecurityHeadersMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# In development Django serves files directly from `static/`, so browser
+# checks see a changed stylesheet immediately. WhiteNoise serves the collected,
+# manifest-hashed assets in production only.
+if not DEBUG:
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 ROOT_URLCONF = 'ledgerhouse.urls'
 
@@ -72,6 +78,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'accounting.context_processors.static_asset_versions',
             ],
         },
     },
@@ -159,6 +166,7 @@ if not DEBUG:
         CSRF_COOKIE_SECURE = True
         SECURE_HSTS_SECONDS = 31536000
         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
         SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Default primary key field type
@@ -171,23 +179,30 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 HMRC_ENVIRONMENT = os.environ.get('HMRC_ENVIRONMENT', 'sandbox')
 HMRC_CLIENT_ID = os.environ.get('HMRC_CLIENT_ID', '')
 HMRC_CLIENT_SECRET = os.environ.get('HMRC_CLIENT_SECRET', '')
+HMRC_APPLICATION_NAME = os.environ.get('HMRC_APPLICATION_NAME', 'LedgerHouse')
+HMRC_APPLICATION_OWNER = os.environ.get('HMRC_APPLICATION_OWNER', '')
+HMRC_SUBSCRIBED_APIS = tuple(
+    api.strip()
+    for api in os.environ.get('HMRC_SUBSCRIBED_APIS', '').split(',')
+    if api.strip()
+)
 HMRC_REDIRECT_URI = os.environ.get(
     'HMRC_REDIRECT_URI',
     'http://localhost:8000/api/integrations/hmrc/callback',
-)
+) or 'http://localhost:8000/api/integrations/hmrc/callback'
 HMRC_SCOPES = os.environ.get('HMRC_SCOPES', 'read:vat write:vat')
 HMRC_API_BASE_URL = os.environ.get(
     'HMRC_API_BASE_URL',
     'https://test-api.service.hmrc.gov.uk',
-)
+) or 'https://test-api.service.hmrc.gov.uk'
 HMRC_AUTHORIZE_URL = os.environ.get(
     'HMRC_AUTHORIZE_URL',
     f'{HMRC_API_BASE_URL}/oauth/authorize',
-)
+) or f'{HMRC_API_BASE_URL}/oauth/authorize'
 HMRC_TOKEN_URL = os.environ.get(
     'HMRC_TOKEN_URL',
     f'{HMRC_API_BASE_URL}/oauth/token',
-)
+) or f'{HMRC_API_BASE_URL}/oauth/token'
 HMRC_VENDOR_PUBLIC_IP = os.environ.get('HMRC_VENDOR_PUBLIC_IP', '127.0.0.1')
 HMRC_VENDOR_VERSION = os.environ.get('HMRC_VENDOR_VERSION', 'LedgerHouse=local')
 
@@ -207,3 +222,37 @@ COMPANIES_HOUSE_API_KEY_FILE = os.environ.get(
     'COMPANIES_HOUSE_API_KEY_FILE',
     str(Path.home() / '.companies_house_api_key'),
 )
+COMPANIES_HOUSE_FILING_CREDENTIALS_FILE = os.environ.get(
+    'COMPANIES_HOUSE_FILING_CREDENTIALS_FILE',
+    str(Path.home() / '.ledgerhouse' / 'companies_house_filing.env'),
+)
+COMPANIES_HOUSE_FILING_PRESENTER_ID = os.environ.get('COMPANIES_HOUSE_FILING_PRESENTER_ID', '')
+COMPANIES_HOUSE_FILING_AUTHENTICATION_VALUE = os.environ.get(
+    'COMPANIES_HOUSE_FILING_AUTHENTICATION_VALUE',
+    '',
+)
+COMPANIES_HOUSE_FILING_TEST_FLAG = os.environ.get('COMPANIES_HOUSE_FILING_TEST_FLAG', '')
+COMPANIES_HOUSE_FILING_PACKAGE_REFERENCE = os.environ.get(
+    'COMPANIES_HOUSE_FILING_PACKAGE_REFERENCE',
+    '',
+)
+COMPANIES_HOUSE_FILING_PRODUCT_KEY = os.environ.get('COMPANIES_HOUSE_FILING_PRODUCT_KEY', '')
+# A prepared package is not permission to send it. This remains false until
+# the local evidence pack has been reviewed and a deliberate test-run decision
+# is recorded by the practice.
+COMPANIES_HOUSE_FILING_SEND_ENABLED = os.environ.get(
+    'COMPANIES_HOUSE_FILING_SEND_ENABLED',
+    'False',
+).lower() in ('true', '1', 'yes')
+COMPANIES_HOUSE_FILING_GATEWAY_URL = os.environ.get(
+    'COMPANIES_HOUSE_FILING_GATEWAY_URL',
+    '',
+)
+COMPANIES_HOUSE_FILING_LIVE_ENABLED = os.environ.get(
+    'COMPANIES_HOUSE_FILING_LIVE_ENABLED',
+    'False',
+).lower() in ('true', '1', 'yes')
+COMPANIES_HOUSE_LIVE_APPROVAL_CONFIRMED = os.environ.get(
+    'COMPANIES_HOUSE_LIVE_APPROVAL_CONFIRMED',
+    'False',
+).lower() in ('true', '1', 'yes')

@@ -18,6 +18,7 @@ packages:
   - ufw
   - fail2ban
   - unattended-upgrades
+  - postgresql-client
   - debian-keyring
   - debian-archive-keyring
   - apt-transport-https

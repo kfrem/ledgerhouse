@@ -13,11 +13,16 @@ from accounting.mtd import (
     build_desktop_fraud_prevention_headers,
     build_web_app_via_server_fraud_prevention_headers,
     build_hmrc_authorisation_url,
+    call_hmrc_sandbox_keepalive,
+    exchange_hmrc_authorisation_code,
+    exchange_hmrc_client_credentials_token,
+    submit_vat_return_to_hmrc,
     hmrc_sandbox_status,
     retrieve_vat_obligations,
     retrieve_vat_return,
     submit_vat_return_payload,
     to_hmrc_vat_return_payload,
+    unpack_hmrc_state,
     validate_fraud_prevention_headers,
 )
 from accounting.models import HmrcVatConnection, Tenant, VatReturn, VatReview
@@ -46,6 +51,11 @@ class HmrcSandboxIntegrationTests(TestCase):
             "finalised": True,
         }
 
+    def _start_oauth(self, next_url="/integrations/hmrc/"):
+        response = self.client.get(reverse("hmrc_authorise"), {"next": next_url})
+        self.assertEqual(response.status_code, 302)
+        return parse_qs(urlparse(response["Location"]).query)["state"][0]
+
     @override_settings(HMRC_CLIENT_ID="", HMRC_CLIENT_SECRET="")
     def test_status_reports_missing_secret_without_exposing_values(self):
         status = hmrc_sandbox_status()
@@ -53,12 +63,76 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertFalse(status["configured"])
         self.assertFalse(status["required"]["client_id"])
         self.assertFalse(status["required"]["client_secret"])
-        self.assertIn("VAT (MTD) 1.0", status["subscribed_apis"])
-        self.assertIn("Test Fraud Prevention Headers 1.0", status["subscribed_apis"])
+        self.assertFalse(status["required"]["ledgerhouse_application"])
+        self.assertFalse(status["required"]["vat_subscription"])
+        self.assertEqual(status["subscribed_apis"], ())
+
+    @override_settings(
+        HMRC_ENVIRONMENT="sandbox",
+        HMRC_API_BASE_URL="https://test-api.service.hmrc.gov.uk",
+    )
+    @patch("accounting.mtd._hmrc_json_request")
+    @patch("accounting.mtd.exchange_hmrc_client_credentials_token")
+    def test_keepalive_uses_application_endpoint_and_returns_redacted_evidence(
+        self, token_exchange, hmrc_request
+    ):
+        token_exchange.return_value = {"access_token": "sandbox-access-token"}
+        hmrc_request.return_value = {
+            "status": 200,
+            "payload": {"message": "Hello Application"},
+        }
+
+        evidence = call_hmrc_sandbox_keepalive()
+
+        self.assertEqual(evidence["application"], "LedgerHouse")
+        self.assertEqual(evidence["endpoint"], "GET /hello/application")
+        self.assertEqual(evidence["http_status"], 200)
+        hmrc_request.assert_called_once_with(
+            "https://test-api.service.hmrc.gov.uk/hello/application",
+            "sandbox-access-token",
+        )
+        self.assertNotIn("sandbox-access-token", str(evidence))
+
+    @override_settings(HMRC_ENVIRONMENT="production")
+    def test_keepalive_fails_closed_outside_the_sandbox(self):
+        with self.assertRaisesRegex(ValueError, "permitted only in the sandbox"):
+            call_hmrc_sandbox_keepalive()
+
+    @patch("accounting.mtd.exchange_hmrc_client_credentials_token")
+    def test_keepalive_rejects_missing_access_token(self, token_exchange):
+        token_exchange.return_value = {}
+
+        with self.assertRaises(HmrcApiError) as raised:
+            call_hmrc_sandbox_keepalive()
+
+        self.assertEqual(raised.exception.status_code, 502)
+
+    def test_legacy_mock_submission_path_fails_without_changing_vat_return(self):
+        tenant = Tenant.objects.create(name="No Mock Submission Ltd")
+        vat_return = VatReturn.objects.create(
+            tenant=tenant,
+            period_key="26A1",
+            start_date="2026-01-01",
+            end_date="2026-03-31",
+            locked_by="test",
+            total_output_vat="0.00",
+            total_input_vat="0.00",
+            net_vat_payable="0.00",
+        )
+
+        with self.assertRaises(HmrcApiError) as raised:
+            submit_vat_return_to_hmrc(tenant, vat_return)
+
+        vat_return.refresh_from_db()
+        self.assertEqual(raised.exception.status_code, 503)
+        self.assertNotEqual(vat_return.status, "Submitted")
+        self.assertIsNone(vat_return.hmrc_receipt_id)
 
     @override_settings(
         HMRC_CLIENT_ID="sandbox-client-id",
         HMRC_CLIENT_SECRET="sandbox-secret",
+        HMRC_APPLICATION_OWNER="LedgerHouse",
+        HMRC_SUBSCRIBED_APIS="VAT (MTD) 1.0",
         HMRC_SCOPES="read:vat write:vat",
         HMRC_REDIRECT_URI="http://localhost:8000/api/integrations/hmrc/callback",
         HMRC_AUTHORIZE_URL="https://test-api.service.hmrc.gov.uk/oauth/authorize",
@@ -83,6 +157,8 @@ class HmrcSandboxIntegrationTests(TestCase):
     @override_settings(
         HMRC_CLIENT_ID="sandbox-client-id",
         HMRC_CLIENT_SECRET="sandbox-secret",
+        HMRC_APPLICATION_OWNER="LedgerHouse",
+        HMRC_SUBSCRIBED_APIS="VAT (MTD) 1.0",
         HMRC_SCOPES="read:vat write:vat",
         HMRC_REDIRECT_URI="http://localhost:8000/api/integrations/hmrc/callback",
         HMRC_AUTHORIZE_URL="https://test-api.service.hmrc.gov.uk/oauth/authorize",
@@ -93,17 +169,40 @@ class HmrcSandboxIntegrationTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response["Location"].startswith("https://test-api.service.hmrc.gov.uk/oauth/authorize?"))
+        state = parse_qs(urlparse(response["Location"]).query)["state"][0]
+        self.assertEqual(self.client.session["hmrc_oauth_state"], state)
 
     @override_settings(
         HMRC_CLIENT_ID="sandbox-client-id",
         HMRC_CLIENT_SECRET="sandbox-secret",
+        HMRC_APPLICATION_OWNER="LedgerHouse",
+        HMRC_SUBSCRIBED_APIS="VAT (MTD) 1.0",
+        HMRC_SCOPES="read:vat write:vat",
+        HMRC_REDIRECT_URI="http://localhost:8000/api/integrations/hmrc/callback",
+    )
+    def test_authorise_view_replaces_external_return_url(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("hmrc_authorise"),
+            {"next": "https://attacker.example/collect"},
+        )
+
+        state = parse_qs(urlparse(response["Location"]).query)["state"][0]
+        unpacked = unpack_hmrc_state(state)
+        self.assertEqual(unpacked["next"], reverse("hmrc_sandbox_status"))
+
+    @override_settings(
+        HMRC_CLIENT_ID="sandbox-client-id",
+        HMRC_CLIENT_SECRET="sandbox-secret",
+        HMRC_APPLICATION_OWNER="LedgerHouse",
+        HMRC_SUBSCRIBED_APIS="VAT (MTD) 1.0",
         HMRC_SCOPES="read:vat write:vat",
         HMRC_REDIRECT_URI="http://localhost:8000/api/integrations/hmrc/callback",
     )
     def test_callback_stores_token_payload_from_hmrc_exchange(self):
         self.client.force_login(self.user)
-        authorisation_url = build_hmrc_authorisation_url("/integrations/hmrc/")
-        state = parse_qs(urlparse(authorisation_url).query)["state"][0]
+        state = self._start_oauth("/integrations/hmrc/")
 
         with patch(
             "accounting.views.exchange_hmrc_authorisation_code",
@@ -123,6 +222,34 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertEqual(response["Location"], "/integrations/hmrc/")
         exchange.assert_called_once_with("auth-code")
         self.assertEqual(self.client.session["hmrc_sandbox_token"]["scope"], "read:vat write:vat")
+        self.assertNotIn("access_token", self.client.session["hmrc_sandbox_token"])
+        self.assertNotIn("refresh_token", self.client.session["hmrc_sandbox_token"])
+
+    @override_settings(
+        HMRC_CLIENT_ID="sandbox-client-id",
+        HMRC_CLIENT_SECRET="sandbox-secret",
+        HMRC_APPLICATION_OWNER="LedgerHouse",
+        HMRC_SUBSCRIBED_APIS="VAT (MTD) 1.0",
+        HMRC_SCOPES="read:vat write:vat",
+        HMRC_REDIRECT_URI="http://localhost:8000/api/integrations/hmrc/callback",
+    )
+    @patch("accounting.views.exchange_hmrc_authorisation_code")
+    def test_callback_rejects_unmatched_and_replayed_state(self, exchange):
+        self.client.force_login(self.user)
+        state = self._start_oauth()
+
+        unmatched = self.client.get(
+            reverse("hmrc_callback"),
+            {"code": "auth-code", "state": state + "changed"},
+        )
+        replay = self.client.get(
+            reverse("hmrc_callback"),
+            {"code": "auth-code", "state": state},
+        )
+
+        self.assertEqual(unmatched["Location"], reverse("hmrc_sandbox_status"))
+        self.assertEqual(replay["Location"], reverse("hmrc_sandbox_status"))
+        exchange.assert_not_called()
 
     def test_desktop_fraud_prevention_headers_have_required_basics(self):
         headers = build_desktop_fraud_prevention_headers(
@@ -355,16 +482,15 @@ class HmrcSandboxIntegrationTests(TestCase):
     @override_settings(
         HMRC_CLIENT_ID="sandbox-client-id",
         HMRC_CLIENT_SECRET="sandbox-secret",
+        HMRC_APPLICATION_OWNER="LedgerHouse",
+        HMRC_SUBSCRIBED_APIS="VAT (MTD) 1.0",
         HMRC_SCOPES="read:vat write:vat",
         HMRC_REDIRECT_URI="http://localhost:8000/api/integrations/hmrc/callback",
     )
     def test_callback_persists_token_to_selected_tenant_connection(self):
         tenant = Tenant.objects.create(name="OAuth Client Ltd")
         self.client.force_login(self.user)
-        authorisation_url = build_hmrc_authorisation_url(
-            f"/integrations/hmrc/vat/?company={tenant.id}"
-        )
-        state = parse_qs(urlparse(authorisation_url).query)["state"][0]
+        state = self._start_oauth(f"/integrations/hmrc/vat/?company={tenant.id}")
 
         with patch(
             "accounting.views.exchange_hmrc_authorisation_code",
@@ -386,6 +512,56 @@ class HmrcSandboxIntegrationTests(TestCase):
         self.assertEqual(connection.status, "Connected")
         self.assertEqual(connection.scope, "read:vat write:vat")
         self.assertTrue(connection.access_token)
+
+    @override_settings(
+        HMRC_CLIENT_ID="sandbox-client-id",
+        HMRC_CLIENT_SECRET="sandbox-secret",
+        HMRC_TOKEN_URL="https://test-api.service.hmrc.gov.uk/oauth/token",
+    )
+    @patch("accounting.mtd.urllib.request.urlopen")
+    def test_token_exchange_rejects_missing_token_and_malformed_json(self, urlopen):
+        response = urlopen.return_value.__enter__.return_value
+        response.read.return_value = b'{"expires_in":14400}'
+        with self.assertRaises(HmrcApiError) as missing:
+            exchange_hmrc_client_credentials_token()
+        self.assertEqual(missing.exception.status_code, 502)
+
+        response.read.return_value = b'not-json'
+        with self.assertRaises(HmrcApiError) as malformed:
+            exchange_hmrc_authorisation_code("single-use-code")
+        self.assertEqual(malformed.exception.status_code, 502)
+
+    @override_settings(
+        HMRC_CLIENT_ID="sandbox-client-id",
+        HMRC_CLIENT_SECRET="sandbox-secret",
+        HMRC_TOKEN_URL="https://test-api.service.hmrc.gov.uk/oauth/token",
+    )
+    @patch("accounting.mtd.urllib.request.urlopen")
+    def test_token_exchange_normalises_network_failure(self, urlopen):
+        urlopen.side_effect = urllib.error.URLError("connection unavailable")
+
+        with self.assertRaises(HmrcApiError) as raised:
+            exchange_hmrc_client_credentials_token()
+
+        self.assertEqual(raised.exception.status_code, 503)
+        self.assertNotIn("connection unavailable", str(raised.exception))
+
+    @override_settings(HMRC_API_BASE_URL="https://test-api.service.hmrc.gov.uk")
+    @patch("accounting.mtd.urllib.request.urlopen")
+    def test_api_request_normalises_network_failure(self, urlopen):
+        urlopen.side_effect = urllib.error.URLError("internal network detail")
+
+        with self.assertRaises(HmrcApiError) as raised:
+            retrieve_vat_obligations(
+                "access-token",
+                "123456789",
+                "2026-01-01",
+                "2026-12-31",
+                "device-123",
+            )
+
+        self.assertEqual(raised.exception.status_code, 503)
+        self.assertNotIn("internal network detail", str(raised.exception))
 
     def test_hmrc_tokens_are_encrypted_in_database_storage(self):
         tenant = Tenant.objects.create(name="Encrypted Token Client Ltd")
@@ -640,3 +816,64 @@ class HmrcSandboxIntegrationTests(TestCase):
         review = VatReview.objects.get(tenant=tenant, period_key="18A2")
         self.assertEqual(review.status, "Submitted")
         self.assertEqual(review.hmrc_receipt_id, "FORM-123")
+
+    @patch("accounting.views.submit_vat_return_payload")
+    def test_vat_workspace_blocks_duplicate_submission_before_provider_call(self, submit_payload):
+        tenant = Tenant.objects.create(name="Duplicate Submission Ltd")
+        HmrcVatConnection.objects.create(
+            tenant=tenant,
+            vrn="123456789",
+            status="Connected",
+            access_token="access-token",
+            latest_obligations=[
+                {
+                    "periodKey": "18A2",
+                    "start": "2017-04-01",
+                    "end": "2017-06-30",
+                    "due": "2017-08-07",
+                    "status": "O",
+                }
+            ],
+        )
+        VatReview.objects.create(
+            tenant=tenant,
+            period_key="18A2",
+            start_date="2017-04-01",
+            end_date="2017-06-30",
+            prepared_payload=self._prepared_payload(),
+            evidence_complete=True,
+            bank_reconciled=True,
+            vat_codes_reviewed=True,
+            exceptions_resolved=True,
+            client_approved=True,
+            status="ClientApproved",
+        )
+        VatReturn.objects.create(
+            tenant=tenant,
+            period_key="18A2",
+            start_date="2017-04-01",
+            end_date="2017-06-30",
+            locked_by="admin",
+            total_output_vat="105.50",
+            total_input_vat="25.25",
+            net_vat_payable="80.25",
+            status="Submitted",
+            hmrc_receipt_id="FORM-EXISTING",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("hmrc_vat_workspace"),
+            {
+                "company": tenant.id,
+                "action": "submit_return",
+                "period_key": "18A2",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        submit_payload.assert_not_called()
+        self.assertEqual(
+            VatReturn.objects.filter(tenant=tenant, period_key="18A2").count(),
+            1,
+        )

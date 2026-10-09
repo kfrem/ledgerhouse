@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | Portfolio</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body>
     <aside class="sidebar" aria-label="Main navigation">
@@ -21,26 +21,29 @@
             <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
             <a class="active" href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
             <a href="{% url 'practice_clients' %}"><span>03</span> Clients</a>
-            <a href="{% url 'practice_ledger_review' %}"><span>04</span> Ledger</a>
-            <a href="{% url 'practice_banking_review' %}"><span>05</span> Banking</a>
-            <a href="{% url 'hmrc_vat_workspace' %}"><span>06</span> VAT</a>
+            <a href="{% url 'practice_accounts_department' %}"><span>04</span> Accounts dept</a>
+            <a href="{% url 'practice_ledger_review' %}"><span>05</span> Ledger</a>
+            <a href="{% url 'practice_banking_review' %}"><span>06</span> Banking</a>
+            <a href="{% url 'hmrc_vat_workspace' %}"><span>07</span> Compliance</a>
+            <a href="{% url 'launch_readiness' %}"><span>08</span> Launch</a>
         </nav>
 
         <section class="sidebar-panel">
             <p>Production</p>
-            <strong>Secure workspace</strong>
-            <small>HTTPS live, PostgreSQL active, restricted runtime role.</small>
+            <strong>Finance office</strong>
+            <small>Client records, bookkeeping, reports and compliance in one place.</small>
         </section>
     </aside>
 
     <main class="workspace">
         <header class="topbar">
             <div>
-                <p class="eyebrow">Accounting operations suite</p>
-                <h1>Portfolio command centre</h1>
+                <p class="eyebrow">Practice workspace</p>
+                <h1>Practice overview</h1>
             </div>
             <div class="topbar-actions">
-                <a class="ghost-button" href="/admin/">Data room</a>
+                <a class="ghost-button" href="{% url 'practice_exception_register' %}">Exceptions</a>
+                <a class="ghost-button" href="{% url 'practice_accounts_production' %}">Accounts production</a>
                 <form action="{% url 'logout' %}" method="post">
                     {% csrf_token %}
                     <button type="submit" class="solid-button">Sign out</button>
@@ -48,33 +51,15 @@
             </div>
         </header>
 
-        <section class="hero-panel">
-            <div class="hero-copy">
+        <section class="workday-header" aria-label="Today in the practice">
+            <div>
                 <p class="eyebrow">Today</p>
-                <h2>{{ tenant_count }} clients under control</h2>
-                <p class="hero-text">Live ledger totals, compliance signals, bank matching and evidence readiness in one controlled finance workspace.</p>
-                <div class="hero-actions">
-                    <a class="solid-button" href="{% url 'practice_ledger_review' %}">Review ledger</a>
-                    <a class="ghost-button dark" href="{% url 'practice_banking_review' %}">Open banking</a>
-                </div>
+                <h2>{{ tenant_count }} active client{{ tenant_count|pluralize }}</h2>
+                <p>Review items that need a decision, then move into the relevant client file or work queue.</p>
             </div>
-            <div class="finance-visual" role="img" aria-label="Portfolio health visual">
-                <div class="visual-card top">
-                    <span>Net position</span>
-                    <strong>{{ margin }}</strong>
-                </div>
-                <div class="bar-chart" aria-hidden="true">
-                    <span class="bar-height-54"></span>
-                    <span class="bar-height-72"></span>
-                    <span class="bar-height-46"></span>
-                    <span class="bar-height-88"></span>
-                    <span class="bar-height-64"></span>
-                    <span class="bar-height-78"></span>
-                </div>
-                <div class="visual-card bottom">
-                    <span>VAT payable</span>
-                    <strong>{{ vat_due }}</strong>
-                </div>
+            <div class="workday-actions">
+                <a class="solid-button" href="{% url 'practice_ledger_review' %}">Review ledger</a>
+                <a class="ghost-button" href="{% url 'practice_banking_review' %}">Review banking</a>
             </div>
         </section>
 
@@ -101,11 +86,35 @@
             </article>
         </section>
 
-        <section class="module-grid" aria-label="Product modules">
+        <section class="surface priority-surface" aria-label="Work needing attention">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Practice priorities</p>
+                    <h2>Work needing attention</h2>
+                </div>
+                <a class="text-link" href="{% url 'practice_exception_register' %}">Open exception register</a>
+            </div>
+            <div class="priority-list">
+                {% for item in workflow_summary %}
+                <a class="priority-row" href="{% url item.href %}">
+                    <span class="priority-count">{{ item.count }}</span>
+                    <span><strong>{{ item.label }}</strong><small>{{ item.detail }}</small></span>
+                    <span class="priority-action">Review</span>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="module-grid" aria-label="Practice areas">
             <a class="module-tile ready" href="{% url 'practice_clients' %}">
                 <span>Clients</span>
-                <strong>Portfolio records</strong>
-                <small>Manage entities, accounts and source activity.</small>
+                <strong>Client files</strong>
+                <small>Open a company file, documents, questions and history.</small>
+            </a>
+            <a class="module-tile ready" href="{% url 'practice_accounts_department' %}">
+                <span>Operations</span>
+                <strong>Accounts department</strong>
+                <small>Sales, purchases, month-end, payroll and statutory work.</small>
             </a>
             <a class="module-tile ready" href="{% url 'practice_ledger_review' %}">
                 <span>Ledger</span>
@@ -118,25 +127,15 @@
                 <small>Bank lines and reconciliation status.</small>
             </a>
             <a class="module-tile" href="{% url 'hmrc_vat_workspace' %}">
-                <span>Tax</span>
-                <strong>VAT control</strong>
-                <small>Returns, locks, receipts and submissions.</small>
+                <span>Compliance</span>
+                <strong>Tax and compliance</strong>
+                <small>VAT and statutory controls, separate from the core ledger.</small>
             </a>
             <a class="module-tile" href="{% url 'companies_house_workspace' %}">
                 <span>Register</span>
                 <strong>Companies House</strong>
                 <small>Official company profiles, filing dates and SIC review.</small>
             </a>
-        </section>
-
-        <section class="workflow-summary" aria-label="Practice workflow summary">
-            {% for item in workflow_summary %}
-            <a class="workflow-card" href="{% url item.href %}">
-                <span>{{ item.label }}</span>
-                <strong>{{ item.count }}</strong>
-                <small>{{ item.detail }}</small>
-            </a>
-            {% endfor %}
         </section>
 
         <section class="content-grid">
@@ -168,8 +167,8 @@
                 <article class="surface compliance-card">
                     <div class="section-heading">
                         <div>
-                            <p class="eyebrow">Compliance</p>
-                            <h2>VAT returns</h2>
+                            <p class="eyebrow">Statutory work</p>
+                            <h2>Compliance returns</h2>
                         </div>
                         <a class="text-link" href="{% url 'hmrc_vat_workspace' %}">Open</a>
                     </div>
@@ -183,7 +182,7 @@
                             <span class="amount">GBP {{ vat_return.net_vat_payable }}</span>
                         </a>
                         {% empty %}
-                        <div class="empty-state">No VAT returns yet.</div>
+                        <div class="empty-state">No statutory returns yet.</div>
                         {% endfor %}
                     </div>
                 </article>
@@ -193,8 +192,8 @@
                     <h2>Practice actions</h2>
                     <ul>
                         <li><a href="#workbench">Client questions: {{ open_client_requests_count }} open</a></li>
-                        <li><a href="{% url 'hmrc_vat_workspace' %}">VAT awaiting client approval: {{ awaiting_client_vat_count }}</a></li>
-                        <li><a href="{% url 'hmrc_vat_workspace' %}">VAT ready to file: {{ ready_to_file_vat_count }}</a></li>
+                        <li><a href="{% url 'hmrc_vat_workspace' %}">Compliance approvals waiting: {{ awaiting_client_vat_count }}</a></li>
+                        <li><a href="{% url 'hmrc_vat_workspace' %}">Returns ready to file: {{ ready_to_file_vat_count }}</a></li>
                         <li><a href="{% url 'client_portal' %}#reports">Management reports available in client portal</a></li>
                     </ul>
                 </article>
@@ -202,8 +201,8 @@
                 <article class="surface integration-card">
                     <div class="section-heading">
                         <div>
-                            <p class="eyebrow">HMRC sandbox</p>
-                            <h2>VAT MTD connection</h2>
+                            <p class="eyebrow">Government services</p>
+                            <h2>HMRC connection</h2>
                         </div>
                         {% if hmrc_status.configured %}
                         <span class="status-pill">Ready</span>
@@ -213,7 +212,7 @@
                     </div>
                     <div class="config-list compact">
                         <div class="config-item">
-                            <span>VAT MTD</span>
+                            <span>MTD service</span>
                             <strong>Subscribed</strong>
                         </div>
                         <div class="config-item">

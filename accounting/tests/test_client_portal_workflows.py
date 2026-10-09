@@ -16,19 +16,31 @@ from accounting.models import (
     AuditEvent,
     BankReconciliation,
     BankTransaction,
+    BankRule,
+    ClientApprovalRecord,
+    ClientInvitation,
     ClientRequest,
     EvidenceDocument,
+    DocumentIntelligenceRule,
     ImportedFile,
     Journal,
     JournalEvidenceLink,
     JournalLine,
     NominalAccount,
+    SubscriptionPlan,
     Tenant,
     TenantUserAccess,
     VatReturn,
     VatReview,
 )
-from accounting.reports import client_data_export_zip, management_report_csv, management_report_pdf
+from accounting.reports import (
+    client_data_export_zip,
+    management_report_context,
+    management_report_csv,
+    management_report_pack_pdf,
+    management_report_pdf,
+)
+from accounting.operations import build_local_accounts_department_suite
 
 
 @pytest.mark.django_db(transaction=True)
@@ -110,16 +122,39 @@ class ClientPortalWorkflowTests(TransactionTestCase):
 
         assert privacy_response.status_code == 200
         assert terms_response.status_code == 200
-        assert "How LedgerHouse handles customer data" in privacy_response.content.decode()
-        assert "LedgerHouse service terms" in terms_response.content.decode()
+        privacy_body = privacy_response.content.decode()
+        terms_body = terms_response.content.decode()
+        assert "How LedgerHouse handles customer data" in privacy_body
+        assert "Retention and deletion" in privacy_body
+        assert "Security contact" in privacy_body
+        assert "LedgerHouse service terms" in terms_body
+        assert "Payments and subscriptions" in terms_body
+        assert "Launch status" in terms_body
 
     def test_practice_workspace_is_separate_from_client_portal(self):
         self.client.force_login(self.user)
         response = self.client.get("/practice/")
         body = response.content.decode()
         assert response.status_code == 200
-        assert "Portfolio command centre" in body
+        assert "Practice overview" in body
         assert "Practice" in body
+        assert "Accounts production" in body
+
+    def test_practice_can_view_launch_readiness_centre(self):
+        self.client.force_login(self.user)
+        response = self.client.get("/practice/launch/")
+        body = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Launch readiness centre" in body
+        assert "Customer and Legal Pack" in body
+        assert "Government Integrations" in body
+        assert "Deployment" in body
+        assert "Final legal review" in body
+        assert "HMRC production approval" in body
+        assert "Companies House filing access" in body
+        assert "Public privacy notice" in body
+        assert "Public service terms" in body
 
     def test_non_staff_client_cannot_access_practice_workspace(self):
         client_user = get_user_model().objects.create_user(
@@ -178,6 +213,51 @@ class ClientPortalWorkflowTests(TransactionTestCase):
 
         assert response.status_code == 404
 
+    def test_client_can_review_local_approval_queue(self):
+        build_local_accounts_department_suite(self.tenant, "practice")
+        client_user = get_user_model().objects.create_user(
+            username="approval-client",
+            password="client-pass",
+            is_staff=False,
+        )
+        TenantUserAccess.objects.create(
+            tenant=self.tenant,
+            user=client_user,
+            role=TenantUserAccess.ROLE_CLIENT,
+        )
+        self.client.force_login(client_user)
+
+        page = self.client.get(f"/?company={self.tenant.id}#approvals")
+        body = page.content.decode()
+
+        assert page.status_code == 200
+        assert "Your approval queue" in body
+        assert "Management pack to" in body
+        assert "Statutory accounts draft to" in body
+
+        approval = ClientApprovalRecord.objects.filter(
+            tenant=self.tenant,
+            approval_type=ClientApprovalRecord.TYPE_MANAGEMENT_PACK,
+            status=ClientApprovalRecord.STATUS_PENDING,
+        ).first()
+        response = self.client.post(
+            "/",
+            {
+                "company": str(self.tenant.id),
+                "action": "approve_client_item",
+                "approval_id": str(approval.id),
+                "decision_note": "Approved for local review.",
+            },
+        )
+
+        approval.refresh_from_db()
+        assert response.status_code == 302
+        assert response["Location"].endswith("#approvals")
+        assert approval.status == ClientApprovalRecord.STATUS_APPROVED
+        assert approval.decided_by == "approval-client"
+        assert approval.decision_note == "Approved for local review."
+        assert AuditEvent.objects.filter(tenant=self.tenant, event_type="ClientApproval").exists()
+
     def test_practice_can_create_client_in_app(self):
         self.client.force_login(self.user)
 
@@ -235,16 +315,36 @@ class ClientPortalWorkflowTests(TransactionTestCase):
 
     def test_pdf_upload_stores_evidence_document(self):
         pdf_file = SimpleUploadedFile(
-            "receipt.pdf",
-            b"%PDF-1.4\n% demo receipt\n",
+            "supplier-invoice-125.pdf",
+            b"%PDF-1.4\nSupplier invoice total GBP 125.40\n",
             content_type="application/pdf",
         )
         result = process_uploaded_file(self.tenant, pdf_file, "client")
         assert result.kind == "evidence"
-        assert EvidenceDocument.objects.filter(
+        document = EvidenceDocument.objects.get(
             tenant=self.tenant,
-            filename="receipt.pdf",
+            filename="supplier-invoice-125.pdf",
             content_type="application/pdf",
+        )
+        assert result.category == "PurchaseInvoice"
+        assert document.document_category == "PurchaseInvoice"
+        assert document.gross_amount == Decimal("125.40")
+        assert document.suggested_account_code == "6000"
+        assert "Practice review is still required" in document.review_note
+
+    def test_empty_upload_is_rejected_before_intake(self):
+        empty_file = SimpleUploadedFile(
+            "empty-receipt.pdf",
+            b"",
+            content_type="application/pdf",
+        )
+
+        with pytest.raises(ValueError, match="Uploaded file is empty."):
+            process_uploaded_file(self.tenant, empty_file, "client")
+
+        assert not EvidenceDocument.objects.filter(
+            tenant=self.tenant,
+            filename="empty-receipt.pdf",
         ).exists()
 
     def test_client_portal_shows_recent_uploads(self):
@@ -316,7 +416,8 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Director card purchase" in body
         assert f"/practice/clients/{self.tenant.id}/" in body
         assert "Live controls" in body
-        assert "Practice workflow summary" in body
+        assert "Practice priorities" in body
+        assert "Work needing attention" in body
         assert "Ledger review" in body
         assert "Client questions: 1 open" in body
         assert "Next build" not in body
@@ -329,6 +430,20 @@ class ClientPortalWorkflowTests(TransactionTestCase):
             file_content=b"%PDF-1.4\n% awaiting review\n",
             content_type="application/pdf",
             uploaded_by="client",
+        )
+        imported_file = ImportedFile.objects.create(
+            tenant=self.tenant,
+            filename="client-action-bank.csv",
+            raw_content="date,amount,reference\n2026-07-15,-42.00,Unknown card payment\n",
+            file_hash="client-action-bank",
+        )
+        BankTransaction.objects.create(
+            tenant=self.tenant,
+            imported_file=imported_file,
+            date="2026-07-15",
+            amount=Decimal("-42.00"),
+            reference="Unknown card payment",
+            fitid="CLIENT-ACTION-BANK",
         )
         VatReview.objects.create(
             tenant=self.tenant,
@@ -350,9 +465,36 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "What needs attention" in body
         assert "Upload outstanding paperwork" in body
         assert "Explain unmatched bank lines" in body
-        assert "Review VAT approvals" in body
+        assert "Review statutory approvals" in body
         assert "What your accounts team is working on" in body
-        assert "1 VAT period(s) are ready for client approval." in body
+        assert "1 approval item(s) are waiting for review." in body
+        assert "Your approval queue" in body
+        assert "VAT and tax approvals" in body
+        assert "Accounts department workflow" in body
+        assert "Source documents" in body
+        assert "Bank matching" in body
+        assert "Bookkeeping" in body
+        assert "Management reporting" in body
+        assert "Statutory compliance" in body
+        assert "Company summary" in body
+        assert "Your position at a glance" in body
+        assert "Gross profit" in body
+        assert "Net margin" in body
+        assert "Cash runway" in body
+        assert "Government services" in body
+        assert "Accounts health plan" in body
+        assert "What needs to happen next" in body
+        assert "Records received" in body
+        assert "Source records active" in body
+        assert "Bank matching" in body
+        assert "Needs explanation" in body
+        assert "Bookkeeping position" in body
+        assert "1 bookkeeping entry is recorded." in body
+        assert "Approvals" in body
+        assert "Review needed" in body
+        assert "Management pack" in body
+        assert "Next best action: Upload missing receipts, invoices, payroll files or spreadsheets." in body
+        assert "Next best action: Send the accountant a note for any unknown card payments or receipts." in body
 
     def test_client_can_send_question_to_practice_workbench(self):
         self.client.force_login(self.user)
@@ -442,7 +584,116 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Quote review accrual" in body
         assert f"/reports/{self.tenant.id}/" in body
         assert f"/integrations/hmrc/vat/?company={self.tenant.id}" in body
+        assert "Accounts department workflow" in body
+        assert "Client service pipeline" in body
+        assert "Source documents" in body
+        assert "Bank matching" in body
+        assert "Management reporting" in body
+        assert "Invitations and access" in body
+        assert "Billing status" in body
+        assert "Recent control events" in body
+        assert "Account control" in body
+        assert "Service, billing and integration readiness" in body
+        assert "Local SaaS controls" in body
+        assert "Government services" in body
+        assert "Gross profit" in body
+        assert "Net margin" in body
         assert "/admin/accounting/banktransaction/" not in body
+
+    def test_practice_can_prepare_invitation_and_subscription_status(self):
+        self.client.force_login(self.user)
+
+        invite_response = self.client.post(
+            f"/practice/clients/{self.tenant.id}/",
+            {
+                "action": "create_invitation",
+                "email": "OWNER@example.com",
+                "role": "Client",
+            },
+        )
+        subscription_response = self.client.post(
+            f"/practice/clients/{self.tenant.id}/",
+            {
+                "action": "update_subscription",
+                "plan_name": "Practice pilot",
+                "status": "Trial",
+                "monthly_price": "49.00",
+                "currency": "GBP",
+                "billing_provider": "Stripe",
+                "collection_method": "DirectDebit",
+                "provider_customer_id": "cus_test_local",
+                "provider_subscription_id": "sub_test_local",
+                "next_invoice_date": "2026-08-01",
+                "billing_note": "No payment provider connected yet.",
+            },
+        )
+
+        assert invite_response.status_code == 302
+        assert subscription_response.status_code == 302
+        invitation = ClientInvitation.objects.get(tenant=self.tenant)
+        assert invitation.email == "owner@example.com"
+        subscription = SubscriptionPlan.objects.get(tenant=self.tenant)
+        assert subscription.plan_name == "Practice pilot"
+        assert subscription.monthly_price == Decimal("49.00")
+        assert subscription.billing_provider == "Stripe"
+        assert subscription.collection_method == "DirectDebit"
+        assert subscription.provider_customer_id == "cus_test_local"
+        assert AuditEvent.objects.filter(tenant=self.tenant, event_type="ClientInvitation").exists()
+        assert AuditEvent.objects.filter(tenant=self.tenant, event_type="SubscriptionUpdate").exists()
+
+        detail_response = self.client.get(f"/practice/clients/{self.tenant.id}/")
+        detail_body = detail_response.content.decode()
+        assert "owner@example.com" in detail_body
+        assert f"/invite/{invitation.id}/" in detail_body
+        assert "Practice pilot" in detail_body
+
+        invoice_response = self.client.post(
+            f"/practice/clients/{self.tenant.id}/",
+            {"action": "mark_invoice_sent"},
+        )
+        payment_response = self.client.post(
+            f"/practice/clients/{self.tenant.id}/",
+            {"action": "record_manual_payment"},
+        )
+        subscription.refresh_from_db()
+        assert invoice_response.status_code == 302
+        assert payment_response.status_code == 302
+        assert subscription.latest_invoice_status == "Paid"
+        assert subscription.status == "Active"
+        assert subscription.last_payment_at is not None
+        assert AuditEvent.objects.filter(tenant=self.tenant, event_type="BillingAction").count() == 2
+
+    def test_client_can_accept_invitation_and_get_tenant_access(self):
+        invitation = ClientInvitation.objects.create(
+            tenant=self.tenant,
+            email="new.client@example.com",
+            role=TenantUserAccess.ROLE_CLIENT,
+            invited_by="admin",
+        )
+
+        response = self.client.post(
+            f"/invite/{invitation.id}/",
+            {
+                "full_name": "New Client",
+                "password": "clientpass123",
+            },
+        )
+
+        assert response.status_code == 302
+        invitation.refresh_from_db()
+        user = get_user_model().objects.get(username="new.client@example.com")
+        assert invitation.status == ClientInvitation.STATUS_ACCEPTED
+        assert invitation.accepted_by == user.username
+        assert TenantUserAccess.objects.filter(
+            tenant=self.tenant,
+            user=user,
+            role=TenantUserAccess.ROLE_CLIENT,
+            is_active=True,
+        ).exists()
+        assert AuditEvent.objects.filter(
+            tenant=self.tenant,
+            event_type="ClientInvitationAccepted",
+        ).exists()
 
     def test_practice_can_update_client_question_status_in_app(self):
         request_item = ClientRequest.objects.create(
@@ -495,6 +746,13 @@ class ClientPortalWorkflowTests(TransactionTestCase):
             reference="Unmatched software",
             fitid="FITID-BANK-OPEN",
         )
+        BankRule.objects.create(
+            tenant=self.tenant,
+            name="Software bank rule",
+            match_text="software",
+            account_code="6200",
+            confidence=Decimal("94.00"),
+        )
         matched_transaction = BankTransaction.objects.create(
             tenant=self.tenant,
             imported_file=imported_file,
@@ -525,6 +783,8 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert response.status_code == 200
         assert "Unmatched bank review" in body
         assert "Unmatched software" in body
+        assert "Suggested by Software bank rule" in body
+        assert "account 6200" in body
         assert "GBP -58.20" in body
         assert "Matched receipt" not in body
         assert f"/practice/clients/{open_transaction.tenant.id}/" in body
@@ -547,6 +807,7 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         posted_journal = Journal.objects.get(tenant=self.tenant, source_id="FITID-BANK-OPEN")
         assert posted_journal.source_type == "BankPayment"
         assert posted_journal.lines.count() == 2
+        assert posted_journal.lines.filter(account__code="6200", debit=Decimal("58.20")).exists()
         assert BankReconciliation.objects.filter(
             tenant=self.tenant,
             bank_transaction=open_transaction,
@@ -609,6 +870,46 @@ class ClientPortalWorkflowTests(TransactionTestCase):
             details__journal_id=review_journal.id,
         ).exists()
 
+    def test_document_intelligence_rule_populates_review_suggestions(self):
+        DocumentIntelligenceRule.objects.create(
+            tenant=self.tenant,
+            name="Fuel receipt detector",
+            keyword="fuel",
+            document_category="Receipt",
+            suggested_account_code="6100",
+            confidence=Decimal("92.00"),
+        )
+        document = EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="fuel-receipt-2026-07-10.txt",
+            file_content=b"Fuel receipt 2026-07-10 GBP 72.00 VAT",
+            content_type="text/plain",
+            uploaded_by="client",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            f"/practice/evidence/?company={self.tenant.id}",
+            {
+                "action": "analyse_evidence",
+                "document_id": str(document.id),
+                "company": str(self.tenant.id),
+            },
+        )
+
+        document.refresh_from_db()
+        assert response.status_code == 302
+        assert document.document_category == "Receipt"
+        assert document.suggested_account_code == "6100"
+        assert document.gross_amount == Decimal("72.00")
+        assert document.vat_amount == Decimal("12.00")
+        assert "Local document intelligence populated suggested fields." in document.review_note
+        assert AuditEvent.objects.filter(
+            tenant=self.tenant,
+            event_type="EvidenceAnalysis",
+            details__document_id=document.id,
+        ).exists()
+
     def test_practice_can_review_evidence_uploads_in_app(self):
         unlinked_document = EvidenceDocument.objects.create(
             tenant=self.tenant,
@@ -659,12 +960,24 @@ class ClientPortalWorkflowTests(TransactionTestCase):
                 "action": "update_evidence_review",
                 "document_id": str(unlinked_document.id),
                 "review_status": "ReadyForPosting",
+                "document_category": "PurchaseInvoice",
+                "supplier_or_customer": "Stationery Supplier Ltd",
+                "document_date": "2026-07-10",
+                "gross_amount": "120.00",
+                "vat_amount": "20.00",
+                "suggested_account_code": "6000",
+                "review_note": "Post as office costs after client confirmation.",
                 "company": str(self.tenant.id),
             },
         )
         unlinked_document.refresh_from_db()
         assert update_response.status_code == 302
         assert unlinked_document.review_status == "ReadyForPosting"
+        assert unlinked_document.document_category == "PurchaseInvoice"
+        assert unlinked_document.supplier_or_customer == "Stationery Supplier Ltd"
+        assert unlinked_document.gross_amount == Decimal("120.00")
+        assert unlinked_document.vat_amount == Decimal("20.00")
+        assert unlinked_document.suggested_account_code == "6000"
         assert unlinked_document.reviewed_by == "admin"
         assert unlinked_document.reviewed_at is not None
         evidence_journal = Journal.objects.get(
@@ -673,7 +986,9 @@ class ClientPortalWorkflowTests(TransactionTestCase):
             source_id=f"EVIDENCE-{unlinked_document.id}",
         )
         assert evidence_journal.status == "RequiresReview"
-        assert evidence_journal.lines.count() == 2
+        assert evidence_journal.lines.count() == 3
+        assert sum((line.debit for line in evidence_journal.lines.all()), Decimal("0.00")) == Decimal("120.00")
+        assert sum((line.credit for line in evidence_journal.lines.all()), Decimal("0.00")) == Decimal("120.00")
         assert JournalEvidenceLink.objects.filter(
             tenant=self.tenant,
             journal=evidence_journal,
@@ -684,6 +999,53 @@ class ClientPortalWorkflowTests(TransactionTestCase):
             event_type="EvidenceReview",
             details__document_id=unlinked_document.id,
         ).exists()
+
+        detail_response = self.client.get(f"/practice/evidence/{unlinked_document.id}/")
+        detail_body = detail_response.content.decode()
+        assert detail_response.status_code == 200
+        assert "Evidence detail" in detail_body
+        assert "Stationery Supplier Ltd" in detail_body
+        assert "Post as office costs" in detail_body
+
+        file_response = self.client.get(f"/practice/evidence/{unlinked_document.id}/file/")
+        assert file_response.status_code == 200
+        assert file_response["Content-Type"] == "application/pdf"
+
+    def test_practice_can_analyse_and_post_evidence_from_detail_page(self):
+        document = EvidenceDocument.objects.create(
+            tenant=self.tenant,
+            filename="2026-07-12-stationery-invoice-240.00.txt",
+            file_content=b"Supplier: Stationery Partner\nInvoice total GBP 240.00 including VAT\n",
+            content_type="text/plain",
+            uploaded_by="client",
+        )
+        self.client.force_login(self.user)
+
+        analyse_response = self.client.post(
+            f"/practice/evidence/{document.id}/",
+            {"action": "analyse_evidence"},
+        )
+        document.refresh_from_db()
+        assert analyse_response.status_code == 302
+        assert document.document_category == "PurchaseInvoice"
+        assert document.gross_amount == Decimal("240.00")
+        assert document.vat_amount == Decimal("40.00")
+        assert document.suggested_account_code == "6000"
+
+        post_response = self.client.post(
+            f"/practice/evidence/{document.id}/",
+            {"action": "post_evidence_journal"},
+        )
+        document.refresh_from_db()
+        journal = Journal.objects.get(
+            tenant=self.tenant,
+            source_type="EvidenceReview",
+            source_id=f"EVIDENCE-{document.id}",
+        )
+        assert post_response.status_code == 302
+        assert document.review_status == "ReadyForPosting"
+        assert journal.lines.count() == 3
+        assert JournalEvidenceLink.objects.filter(tenant=self.tenant, journal=journal, document=document).exists()
 
     def test_client_question_requires_subject_and_message(self):
         self.client.force_login(self.user)
@@ -724,15 +1086,34 @@ class ClientPortalWorkflowTests(TransactionTestCase):
             period_key="26A1",
         )
         csv_report = management_report_csv(self.tenant)
+        report_context = management_report_context(self.tenant)
         pdf_report = management_report_pdf(self.tenant)
+        pack_report = management_report_pack_pdf(self.tenant)
         export_zip = client_data_export_zip(self.tenant)
 
         assert "Demo Client Ltd" in csv_report
         assert "Revenue" in csv_report
         assert "Cash balance" in csv_report
         assert "Net assets" in csv_report
+        assert "Gross profit" in csv_report
+        assert "Gross margin %" in csv_report
+        assert "Net margin %" in csv_report
+        assert "Cash runway months" in csv_report
+        assert "Aged debtors" in csv_report
+        assert "Aged creditors" in csv_report
         assert "Open client questions" in csv_report
+        assert "Plain-English summary" in csv_report
+        assert "Workflow stage" in csv_report
+        assert "Local accounting adjustment" in csv_report
+        assert "Action point" in csv_report
+        assert "Review 1 uploaded document(s) before finalising the bookkeeping." in csv_report
+        assert report_context["action_points"]
+        assert report_context["action_points"][0] == "Review 1 uploaded document(s) before finalising the bookkeeping."
+        assert report_context["plain_english_summary"]
+        assert report_context["workflow_board"]
+        assert report_context["local_accounting_adjustments"]
         assert pdf_report.startswith(b"%PDF")
+        assert pack_report.startswith(b"%PDF")
         with zipfile.ZipFile(BytesIO(export_zip)) as exported:
             names = set(exported.namelist())
             assert "README.txt" in names
@@ -741,19 +1122,43 @@ class ClientPortalWorkflowTests(TransactionTestCase):
             assert "bank_transactions.csv" in names
             assert "vat_returns.csv" in names
             assert "evidence_documents.csv" in names
+            assert "client_invitations.csv" in names
+            assert "subscription.csv" in names
+            assert "sales_quotes.csv" in names
+            assert "sales_invoices.csv" in names
+            assert "purchase_orders.csv" in names
+            assert "purchase_bills.csv" in names
+            assert "supplier_payment_runs.csv" in names
+            assert "bank_rules.csv" in names
+            assert "month_end_closes.csv" in names
+            assert "accounting_period_locks.csv" in names
+            assert "fixed_assets.csv" in names
+            assert "payroll_summaries.csv" in names
+            assert "corporation_tax_estimates.csv" in names
+            assert "statutory_accounts_drafts.csv" in names
+            assert "management_pack_sections.csv" in names
+            assert "document_intelligence_rules.csv" in names
+            assert "client_approval_records.csv" in names
+            assert "accounting_tasks.csv" in names
+            assert "notification_events.csv" in names
             assert any(name.endswith("-switching-evidence.pdf") for name in names)
             assert "FORM-REPORT" in exported.read("vat_returns.csv").decode()
+            assert "accepted_by" in exported.read("client_invitations.csv").decode()
+            assert "billing_provider" in exported.read("subscription.csv").decode()
 
         self.client.force_login(self.user)
         csv_response = self.client.get(f"/reports/{self.tenant.id}/csv/")
         pdf_response = self.client.get(f"/reports/{self.tenant.id}/pdf/")
         zip_response = self.client.get(f"/reports/{self.tenant.id}/zip/")
+        pack_response = self.client.get(f"/reports/{self.tenant.id}/pack/")
         assert csv_response.status_code == 200
         assert csv_response["Content-Type"] == "text/csv"
         assert pdf_response.status_code == 200
         assert pdf_response["Content-Type"] == "application/pdf"
         assert zip_response.status_code == 200
         assert zip_response["Content-Type"] == "application/zip"
+        assert pack_response.status_code == 200
+        assert pack_response["Content-Type"] == "application/pdf"
 
     def test_client_can_view_management_report_in_app(self):
         EvidenceDocument.objects.create(
@@ -783,6 +1188,7 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "Management report" in portal_body
         assert f"/reports/{self.tenant.id}/" in portal_body
         assert f"/reports/{self.tenant.id}/zip/" in portal_body
+        assert f"/reports/{self.tenant.id}/pack/" in portal_body
         assert "Coming" not in portal_body
 
         report_response = self.client.get(f"/reports/{self.tenant.id}/")
@@ -793,7 +1199,16 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "GBP 1,200.00" in report_body
         assert "Cash balance" in report_body
         assert "Net assets" in report_body
+        assert "Gross profit" in report_body
+        assert "Net margin" in report_body
+        assert "Cash runway" in report_body
+        assert "Operating readiness" in report_body
+        assert "Aged debtors" in report_body
+        assert "Aged creditors" in report_body
         assert "Open questions" in report_body
+        assert "Action points" in report_body
+        assert "What should happen next" in report_body
+        assert "Review 1 uploaded document(s) before finalising the bookkeeping." in report_body
         assert "FORM-REPORT" in report_body
         assert "board-pack-receipt.pdf" in report_body
 
@@ -807,3 +1222,20 @@ class ClientPortalWorkflowTests(TransactionTestCase):
         assert "DEBUG disabled" in text
         assert "FIELD_ENCRYPTION_KEY" in text
         assert "PostgreSQL backend" in text
+
+    def test_local_production_rehearsal_command_passes_local_checks(self):
+        output = StringIO()
+
+        call_command("local_production_rehearsal", stdout=output)
+
+        text = output.getvalue()
+        assert "LedgerHouse local production rehearsal" in text
+        assert "[PASS] Django system check" in text
+        assert "[PASS] Migration state" in text
+        assert "[PASS] Tenant data" in text
+        assert "[PASS] Management report context" in text
+        assert "[PASS] CSV report export" in text
+        assert "[PASS] PDF report exports" in text
+        assert "[PASS] Client data export" in text
+        assert "All local production rehearsal checks passed." in text
+        assert "[FAIL]" not in text

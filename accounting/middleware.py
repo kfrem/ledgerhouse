@@ -1,5 +1,6 @@
-from django.db import connection
 from contextlib import contextmanager
+
+from django.db import DatabaseError, connection
 
 
 def set_connection_tenant(tenant_id):
@@ -15,9 +16,19 @@ def set_connection_tenant(tenant_id):
 
 def reset_connection_tenant():
     """Resets the active tenant UUID in the current PostgreSQL session and returns to default role."""
-    with connection.cursor() as cursor:
-        cursor.execute("RESET app.current_tenant_id")
-        cursor.execute("RESET ROLE")
+    # A database error inside Django's test transaction leaves PostgreSQL unable
+    # to execute cleanup statements. Preserve the original application error;
+    # Django will roll the transaction back before the connection is reused.
+    if connection.needs_rollback:
+        return
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("RESET app.current_tenant_id")
+            cursor.execute("RESET ROLE")
+    except DatabaseError:
+        # Do not hide the request's original database failure with cleanup
+        # work on an already-aborted PostgreSQL transaction.
+        connection.close()
 
 
 @contextmanager
@@ -59,20 +70,7 @@ class TenantMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        tenant_id = None
-        
-        # In a real environment, we'd check request.user.profile.tenant_id.
-        # For simplicity and testability, we check if request has a user and if
-        # the user object has a tenant_id attribute, or we can check header/session.
-        if hasattr(request, 'user') and request.user.is_authenticated:
-            if hasattr(request.user, 'tenant_id'):
-                tenant_id = request.user.tenant_id
-            elif hasattr(request.user, 'profile') and hasattr(request.user.profile, 'tenant_id'):
-                tenant_id = request.user.profile.tenant_id
-                
-        # Also allow passing it via request metadata (useful in tests/views)
-        if hasattr(request, 'tenant_id'):
-            tenant_id = request.tenant_id
+        tenant_id = self._tenant_id_for_request(request)
 
         if tenant_id and connection.vendor == 'postgresql':
             set_connection_tenant(tenant_id)
@@ -84,3 +82,31 @@ class TenantMiddleware:
                 reset_connection_tenant()
                 
         return response
+
+    @staticmethod
+    def _tenant_id_for_request(request):
+        """Select one authorised company for PostgreSQL RLS for this request."""
+        if hasattr(request, "tenant_id") and request.tenant_id:
+            return request.tenant_id
+
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return None
+
+        # Import lazily: this middleware loads while Django initialises apps.
+        from .models import Tenant
+
+        tenants = Tenant.objects.order_by("name") if (user.is_staff or user.is_superuser) else Tenant.objects.filter(
+            user_access__user=user,
+            user_access__is_active=True,
+        ).distinct().order_by("name")
+        # Forms carry the selected company in a hidden field. Honour that value
+        # only after checking it belongs to the authenticated user's tenant set.
+        # Without this, a practice POST could retain the first tenant's RLS
+        # context while the view selected a different valid tenant from POST.
+        requested_tenant_id = request.GET.get("company") or request.POST.get("company")
+        if requested_tenant_id:
+            selected = tenants.filter(id=requested_tenant_id).values_list("id", flat=True).first()
+            if selected:
+                return selected
+        return tenants.values_list("id", flat=True).first()

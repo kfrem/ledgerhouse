@@ -16,7 +16,7 @@ from ..reconciliation import reconcile_transaction_to_invoice, verify_ledger_to_
 from ..reversals import reverse_journal, get_review_metrics
 from ..audit import generate_trial_balance, lock_vat_period, run_accountant_audit_check
 from ..open_banking import sync_bank_feed
-from ..mtd import submit_vat_return_to_hmrc
+from ..mtd import HmrcApiError, submit_vat_return_to_hmrc
 from ..payroll_cis import import_payroll_journal, post_subcontractor_invoice
 
 
@@ -314,7 +314,7 @@ Operations,4000.00,480.00,400.00,800.00,2800.00
                 assert cis_debits == cis_credits
                 assert cis_debits == Decimal("1000.00")
 
-                # 4. HMRC MTD VAT Submission (creates VAT return and locks period)
+                # 4. HMRC MTD VAT legacy mock path fails before any filing side effect.
                 vat_return_ob = VatReturn.objects.create(
                     tenant=tenant,
                     start_date=date(2026, 6, 1),
@@ -324,9 +324,11 @@ Operations,4000.00,480.00,400.00,800.00,2800.00
                     total_input_vat=Decimal("10.00"),
                     net_vat_payable=Decimal("10.00")
                 )
-                response_ob = submit_vat_return_to_hmrc(tenant, vat_return_ob, period_key="26A1")
-                assert response_ob["status"] == "success"
-                assert vat_return_ob.status == "Submitted"
+                with self.assertRaises(HmrcApiError) as raised:
+                    submit_vat_return_to_hmrc(tenant, vat_return_ob, period_key="26A1")
+                assert raised.exception.status_code == 503
+                vat_return_ob.refresh_from_db()
+                assert vat_return_ob.status == "Draft"
 
                 # Clean up to keep the ledger pristine for the subsequent Stage 6 health audit.
                 # The VAT return must be removed FIRST: since migration 0008 the

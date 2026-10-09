@@ -51,10 +51,37 @@ docker compose exec -T web python manage.py local_acceptance_suite --strict --ou
 docker compose exec -T web python manage.py test --noinput
 ```
 
+## Local backup rehearsal
+
+Create a checksummed local data archive and prove that it can be deserialised
+without altering the running database:
+
+```powershell
+docker compose exec -T web python manage.py backup_local_database --restore-rehearsal
+```
+
+The archive is written beneath `backups/`, which is ignored by Git. The
+rehearsal restores only inside a transaction and rolls it back; it is not a
+substitute for a production hosting-provider backup and restore drill.
+
 The acceptance report verifies client and practice pages, report downloads,
 PDF and ZIP generation and the no-HMRC handover pack. The Django suite verifies
 ledger integrity, tenant separation, import/review workflows, exports,
 Companies House local controls and local integration boundaries.
+
+The practice HMRC service register is available at
+`/integrations/hmrc/services/`. It separately tracks VAT MTD, Corporation Tax,
+PAYE RTI, CIS, Income Tax MTD and Self Assessment. Client tax references and
+prepared payloads are encrypted at rest. Local preflight never means HMRC
+acceptance: each service remains unable to submit until its own official HMRC
+test route, approval and credentials have been verified and explicitly enabled.
+
+The workspace also shows the complete Income Tax MTD subscription matrix and
+prepares separate quarterly, annual, SA100, SA800 and SA900 cases.
+`accounting.hmrc_xml` implements the generic Transaction Engine envelope,
+IRmark generation, polling, response parsing and fail-closed transport. It
+accepts only a service body generated and validated against HMRC's current
+schema; it does not invent or silently accept an unvalidated return body.
 
 ## Environment configuration
 
@@ -92,9 +119,10 @@ Before real client data is admitted, comply with the gates in
 
 ## External boundaries
 
-Local automated tests include controlled test doubles for bank data, HMRC
-submission responses and notifications. These demonstrate LedgerHouse's local
-behaviour; they are not live integrations. Real HMRC filing, Companies House
+Local automated tests include controlled test doubles for bank data and
+notifications. HMRC preparation cases and validators demonstrate LedgerHouse's
+local behaviour; they do not create accepted records, provider receipts or
+accounting side effects. Real HMRC filing, Companies House
 production filing, bank feeds, email delivery, payment collection, DNS/TLS and
 backup restoration require the relevant external approvals, credentials or
 service accounts.

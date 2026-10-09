@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | Management report</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body class="client-page">
     <aside class="sidebar client-sidebar" aria-label="Client navigation">
@@ -19,14 +19,14 @@
 
         <nav class="nav-list">
             <a href="{% url 'client_portal' %}?company={{ tenant.id }}"><span>01</span> Client portal</a>
-            <a href="{% url 'client_vat_review' %}?company={{ tenant.id }}"><span>02</span> VAT approval</a>
+            <a href="{% url 'client_vat_review' %}?company={{ tenant.id }}"><span>02</span> Approvals</a>
             <a class="active" href="{% url 'management_report' tenant.id %}"><span>03</span> Reports</a>
         </nav>
 
         <section class="sidebar-panel">
             <p>Report file</p>
             <strong>{{ tenant.name }}</strong>
-            <small>Live local report generated from the current ledger, bank activity, VAT records and evidence vault.</small>
+            <small>Live local report generated from the current ledger, bank activity, statutory records and evidence vault.</small>
         </section>
     </aside>
 
@@ -39,6 +39,7 @@
             <div class="topbar-actions">
                 <a class="ghost-button" href="{% url 'client_portal' %}?company={{ tenant.id }}">Client portal</a>
                 <a class="solid-button" href="{% url 'download_management_report' tenant.id 'pdf' %}">PDF</a>
+                <a class="ghost-button" href="{% url 'download_management_report' tenant.id 'pack' %}">Pack</a>
                 <a class="ghost-button" href="{% url 'download_management_report' tenant.id 'csv' %}">CSV</a>
             </div>
         </header>
@@ -60,10 +61,132 @@
                 <small>Revenue less recorded costs</small>
             </article>
             <article class="client-status-card attention">
-                <span>VAT due</span>
+                <span>Compliance due</span>
                 <strong>{{ vat_due }}</strong>
-                <small>Submitted VAT payable total</small>
+                <small>Submitted statutory payable total</small>
             </article>
+        </section>
+
+        <section class="client-status-grid" aria-label="CFO summary">
+            <article class="client-status-card ready">
+                <span>Gross profit</span>
+                <strong>{{ gross_profit }}</strong>
+                <small>{{ gross_margin }}% gross margin</small>
+            </article>
+            <article class="client-status-card">
+                <span>Net margin</span>
+                <strong>{{ net_margin }}%</strong>
+                <small>Profit after recorded costs</small>
+            </article>
+            <article class="client-status-card">
+                <span>Cash runway</span>
+                <strong>{% if cash_runway_months %}{{ cash_runway_months }} months{% else %}Not enough data{% endif %}</strong>
+                <small>Based on local overhead trend</small>
+            </article>
+            <article class="client-status-card attention">
+                <span>Client service queue</span>
+                <strong>{{ report.open_client_requests }}</strong>
+                <small>Advice or management questions open</small>
+            </article>
+        </section>
+
+        <section class="surface accounts-flow-panel" aria-label="Operating readiness">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Operating readiness</p>
+                    <h2>What the accounts department has under control</h2>
+                </div>
+                <span class="status-pill">Local evidence</span>
+            </div>
+            <div class="accounts-flow-grid compact-flow">
+                {% for item in operating_snapshot %}
+                <div class="accounts-flow-step {{ item.tone }}">
+                    <span>{{ forloop.counter|stringformat:"02d" }}</span>
+                    <strong>{{ item.label }}</strong>
+                    <em>{{ item.status }}</em>
+                    <small>{{ item.detail }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface accounts-flow-panel" aria-label="Plain English summary">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Accountant summary</p>
+                    <h2>What the figures mean</h2>
+                </div>
+                <span class="status-pill">Plain English</span>
+            </div>
+            <div class="mini-stack">
+                {% for summary in report.plain_english_summary %}
+                <div>
+                    <strong>{{ summary }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface accounts-flow-panel" aria-label="Workflow board">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Workflow board</p>
+                    <h2>Workflow board: where the finance-office work sits</h2>
+                </div>
+                <span class="status-pill">Local queue</span>
+            </div>
+            <div class="accounts-flow-grid compact-flow">
+                {% for item in report.workflow_board %}
+                <div class="accounts-flow-step {% if item.count %}attention{% else %}ready{% endif %}">
+                    <span>{{ forloop.counter|stringformat:"02d" }}</span>
+                    <strong>{{ item.stage }}</strong>
+                    <em>{{ item.status }}</em>
+                    <small>{{ item.count }} item(s)</small>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface accounts-flow-panel" aria-label="Report action points">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Action points</p>
+                    <h2>What should happen next</h2>
+                </div>
+                <span class="status-pill">Generated locally</span>
+            </div>
+            <div class="health-plan-list">
+                {% for point in report.action_points %}
+                <div class="health-plan-item">
+                    <span>
+                        <strong>Action {{ forloop.counter }}</strong>
+                        <small>{{ point }}</small>
+                    </span>
+                    <em>Review</em>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface accounts-flow-panel" aria-label="Local accounting adjustments">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Accounting checks</p>
+                    <h2>Adjustments to review locally</h2>
+                </div>
+                <span class="status-pill">Pre-filing checks</span>
+            </div>
+            <div class="health-plan-list">
+                {% for item in report.local_accounting_adjustments %}
+                <div class="health-plan-item">
+                    <span>
+                        <strong>{{ item.label }}</strong>
+                        <small>{{ item.detail }}</small>
+                    </span>
+                    <em>GBP {{ item.value|floatformat:2 }}</em>
+                </div>
+                {% endfor %}
+            </div>
         </section>
 
         <section class="client-status-grid" aria-label="Balance sheet summary">
@@ -86,6 +209,29 @@
                 <span>Net assets</span>
                 <strong>{{ net_assets }}</strong>
                 <small>Assets less liabilities</small>
+            </article>
+        </section>
+
+        <section class="client-status-grid" aria-label="Trading balances">
+            <article class="client-status-card ready">
+                <span>Aged debtors</span>
+                <strong>{{ aged_debtors }}</strong>
+                <small>Customer balances still to collect</small>
+            </article>
+            <article class="client-status-card attention">
+                <span>Aged creditors</span>
+                <strong>{{ aged_creditors }}</strong>
+                <small>Supplier balances still to pay</small>
+            </article>
+            <article class="client-status-card">
+                <span>Evidence in review</span>
+                <strong>{{ report.unreviewed_evidence }}</strong>
+                <small>Files still being processed</small>
+            </article>
+            <article class="client-status-card">
+                <span>Open questions</span>
+                <strong>{{ report.open_client_requests }}</strong>
+                <small>Items needing client/accountant input</small>
             </article>
         </section>
 
@@ -124,7 +270,7 @@
             <article class="client-panel reports-panel">
                 <div class="section-heading">
                     <div>
-                        <p class="eyebrow">VAT</p>
+                        <p class="eyebrow">Compliance</p>
                         <h2>Filed returns</h2>
                     </div>
                 </div>
@@ -138,7 +284,7 @@
                         <em>{{ vat_return.status }}</em>
                     </div>
                     {% empty %}
-                    <div class="empty-state">No submitted VAT returns are recorded for this company yet.</div>
+                    <div class="empty-state">No submitted statutory returns are recorded for this company yet.</div>
                     {% endfor %}
                 </div>
             </article>

@@ -1,0 +1,55 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Accept invitation | LedgerHouse</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
+</head>
+<body class="login-page">
+    <main class="login-shell">
+        <section class="login-visual">
+            <a class="brand" href="{% url 'login' %}" aria-label="LedgerHouse">
+                <span class="brand-mark">LH</span>
+                <span>
+                    <strong>LedgerHouse</strong>
+                    <small>Client access</small>
+                </span>
+            </a>
+            <div>
+                <p class="eyebrow">Invitation</p>
+                <h1>Join {{ tenant.name }} on LedgerHouse.</h1>
+                <p>Your accounts team has prepared access for {{ invitation.email }}.</p>
+            </div>
+        </section>
+
+        <section class="login-panel">
+            <div>
+                <p class="eyebrow">Set up access</p>
+                <h2>Accept invitation</h2>
+            </div>
+            {% if messages %}
+            <div class="message-list">
+                {% for message in messages %}
+                <div class="message {{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if invitation.status == "Accepted" %}
+            <div class="empty-state">This invitation has already been accepted by {{ invitation.accepted_by }}.</div>
+            <a class="solid-button" href="{% url 'login' %}">Go to sign in</a>
+            {% else %}
+            <form method="post" class="login-form">
+                {% csrf_token %}
+                <label for="full_name">Your name</label>
+                <input id="full_name" name="full_name" autocomplete="name">
+                <label for="password">Create password</label>
+                <input id="password" name="password" type="password" autocomplete="new-password" required>
+                <button class="solid-button" type="submit">Create access</button>
+            </form>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>

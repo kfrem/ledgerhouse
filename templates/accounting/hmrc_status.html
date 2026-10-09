@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LedgerHouse | HMRC sandbox</title>
-    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
 </head>
 <body>
     <aside class="sidebar" aria-label="Main navigation">
@@ -22,6 +22,7 @@
             <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
             <a class="active" href="{% url 'hmrc_sandbox_status' %}"><span>03</span> HMRC sandbox</a>
             <a href="{% url 'hmrc_vat_workspace' %}"><span>04</span> VAT</a>
+            <a href="{% url 'hmrc_services_workspace' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}"><span>05</span> Other HMRC services</a>
         </nav>
 
         <section class="sidebar-panel">
@@ -50,12 +51,12 @@
             <div class="section-heading">
                 <div>
                     <p class="eyebrow">Connection status</p>
-                    <h2>KAFS UK Accounting SaaS</h2>
+                    <h2>{{ hmrc_status.application_name }}</h2>
                 </div>
                 {% if hmrc_status.configured %}
                 <span class="status-pill">Ready for OAuth</span>
                 {% else %}
-                <span class="status-pill warning">Needs secret</span>
+                <span class="status-pill warning">Needs LedgerHouse configuration</span>
                 {% endif %}
             </div>
 
@@ -84,6 +85,10 @@
 
             <div class="config-list">
                 <div class="config-item">
+                    <span>Separate LedgerHouse application</span>
+                    <strong>{% if hmrc_status.required.ledgerhouse_application %}Confirmed{% else %}Required{% endif %}</strong>
+                </div>
+                <div class="config-item">
                     <span>Client ID</span>
                     <strong>{% if hmrc_status.required.client_id %}Configured{% else %}Missing{% endif %}</strong>
                 </div>
@@ -94,6 +99,10 @@
                 <div class="config-item">
                     <span>VAT scopes</span>
                     <strong>{% if hmrc_status.required.vat_scopes %}Configured{% else %}Missing{% endif %}</strong>
+                </div>
+                <div class="config-item">
+                    <span>VAT MTD subscription</span>
+                    <strong>{% if hmrc_status.required.vat_subscription %}Confirmed{% else %}Required{% endif %}</strong>
                 </div>
             </div>
 
@@ -106,6 +115,14 @@
                     </span>
                     <em>Added</em>
                 </div>
+                {% empty %}
+                <div class="report-item">
+                    <span>
+                        <strong>No LedgerHouse API subscription declared</strong>
+                        <small>The local runtime does not treat any shared application subscription as available to LedgerHouse.</small>
+                    </span>
+                    <em>Blocked</em>
+                </div>
                 {% endfor %}
             </div>
 
@@ -113,6 +130,7 @@
                 {% if hmrc_status.configured %}
                 <a class="solid-button" href="{% url 'hmrc_authorise' %}">Authorise VAT sandbox</a>
                 <a class="ghost-button" href="{% url 'hmrc_vat_workspace' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}">Open VAT workspace</a>
+                <a class="ghost-button" href="{% url 'hmrc_services_workspace' %}{% if selected_tenant %}?company={{ selected_tenant.id }}{% endif %}">Review all HMRC services</a>
                 {% else %}
                 <button class="solid-button" type="button" disabled>Authorise VAT sandbox</button>
                 {% endif %}

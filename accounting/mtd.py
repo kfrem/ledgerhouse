@@ -1,15 +1,13 @@
-import uuid
 import json
 import hashlib
+import socket
 import urllib.parse
 import urllib.request
 import urllib.error
-from datetime import datetime
 from decimal import Decimal
 from django.conf import settings
 from django.core import signing
 from django.utils import timezone
-from django.db import transaction
 from accounting.models import VatReturn, JournalLine
 
 
@@ -27,24 +25,36 @@ class HmrcApiError(RuntimeError):
 
 def hmrc_sandbox_status():
     """Return non-secret HMRC sandbox readiness details for the practice UI."""
+    application_isolation = (
+        settings.HMRC_APPLICATION_NAME == "LedgerHouse"
+        and settings.HMRC_APPLICATION_OWNER == "LedgerHouse"
+    )
     required = {
+        "ledgerhouse_application": application_isolation,
         "client_id": bool(settings.HMRC_CLIENT_ID),
         "client_secret": bool(settings.HMRC_CLIENT_SECRET),
         "redirect_uri": bool(settings.HMRC_REDIRECT_URI),
         "vat_scopes": "read:vat" in settings.HMRC_SCOPES and "write:vat" in settings.HMRC_SCOPES,
+        "vat_subscription": "VAT (MTD) 1.0" in settings.HMRC_SUBSCRIBED_APIS,
     }
     return {
+        "application_name": settings.HMRC_APPLICATION_NAME,
         "environment": settings.HMRC_ENVIRONMENT,
         "api_base_url": settings.HMRC_API_BASE_URL,
         "redirect_uri": settings.HMRC_REDIRECT_URI,
         "configured": all(required.values()),
         "required": required,
-        "subscribed_apis": ["VAT (MTD) 1.0", "Test Fraud Prevention Headers 1.0"],
+        "subscribed_apis": settings.HMRC_SUBSCRIBED_APIS,
     }
 
 
 def build_hmrc_authorisation_url(next_url="/practice/"):
     """Build the OAuth URL for HMRC VAT MTD user authorisation."""
+    if not hmrc_sandbox_status()["configured"]:
+        raise ValueError(
+            "LedgerHouse's own HMRC sandbox VAT configuration is incomplete. "
+            "Shared application credentials are not accepted."
+        )
     if not settings.HMRC_CLIENT_ID:
         raise ValueError("HMRC_CLIENT_ID is not configured.")
     state = signing.dumps({"next": next_url, "ts": timezone.now().isoformat()}, salt="hmrc-oauth")
@@ -60,6 +70,63 @@ def build_hmrc_authorisation_url(next_url="/practice/"):
 
 def unpack_hmrc_state(state):
     return signing.loads(state, salt="hmrc-oauth", max_age=3600)
+
+
+def _decode_hmrc_json(raw_body, *, status_code=502):
+    try:
+        return json.loads(raw_body.decode("utf-8")) if raw_body else {}
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HmrcApiError(
+            status_code,
+            "HMRC returned a response that LedgerHouse could not read.",
+        ) from exc
+
+
+def _exchange_hmrc_token(body):
+    request = urllib.request.Request(
+        settings.HMRC_TOKEN_URL,
+        data=body,
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = _decode_hmrc_json(response.read())
+    except urllib.error.HTTPError as exc:
+        payload = _decode_hmrc_json(exc.read(), status_code=exc.code)
+        raise HmrcApiError(
+            exc.code,
+            "HMRC rejected the token request.",
+            payload,
+        ) from exc
+    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+        raise HmrcApiError(
+            503,
+            "HMRC could not be reached. No authorisation was saved.",
+        ) from exc
+
+    if not isinstance(payload, dict) or not payload.get("access_token"):
+        raise HmrcApiError(
+            502,
+            "HMRC did not return a usable access token.",
+        )
+    try:
+        expires_in = int(payload.get("expires_in"))
+    except (TypeError, ValueError) as exc:
+        raise HmrcApiError(
+            502,
+            "HMRC did not return a valid token expiry.",
+        ) from exc
+    if expires_in <= 0:
+        raise HmrcApiError(
+            502,
+            "HMRC did not return a valid token expiry.",
+        )
+    payload["expires_in"] = expires_in
+    return payload
 
 
 def exchange_hmrc_authorisation_code(code):
@@ -78,17 +145,7 @@ def exchange_hmrc_authorisation_code(code):
             "code": code,
         }
     ).encode("utf-8")
-    request = urllib.request.Request(
-        settings.HMRC_TOKEN_URL,
-        data=body,
-        headers={
-            "Accept": "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        return json.loads(response.read().decode("utf-8"))
+    return _exchange_hmrc_token(body)
 
 
 def exchange_hmrc_client_credentials_token():
@@ -104,17 +161,39 @@ def exchange_hmrc_client_credentials_token():
             "client_secret": settings.HMRC_CLIENT_SECRET,
         }
     ).encode("utf-8")
-    request = urllib.request.Request(
-        settings.HMRC_TOKEN_URL,
-        data=body,
-        headers={
-            "Accept": "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        method="POST",
+    return _exchange_hmrc_token(body)
+
+
+def call_hmrc_sandbox_keepalive():
+    """Call the LedgerHouse-owned Hello World application endpoint.
+
+    This is deliberately limited to the harmless application-restricted
+    sandbox endpoint. It neither reads client data nor records a filing,
+    receipt or accounting side effect.
+    """
+    if settings.HMRC_ENVIRONMENT != "sandbox":
+        raise ValueError("HMRC keep-alive calls are permitted only in the sandbox.")
+
+    token = exchange_hmrc_client_credentials_token().get("access_token")
+    if not token:
+        raise HmrcApiError(502, "HMRC token response did not contain an access token.")
+
+    response = _hmrc_json_request(
+        f"{settings.HMRC_API_BASE_URL}/hello/application",
+        token,
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        return json.loads(response.read().decode("utf-8"))
+    if response["status"] != 200 or response["payload"].get("message") != "Hello Application":
+        raise HmrcApiError(
+            response["status"],
+            "HMRC Hello World application response was not recognised.",
+            response["payload"],
+        )
+    return {
+        "application": "LedgerHouse",
+        "endpoint": "GET /hello/application",
+        "http_status": response["status"],
+        "timestamp": timezone.now().isoformat(),
+    }
 
 
 def build_desktop_fraud_prevention_headers(device_id, public_ip="127.0.0.1"):
@@ -206,10 +285,10 @@ def _hmrc_json_request(url, access_token, method="GET", payload=None, headers=No
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
-            response_body = response.read().decode("utf-8")
+            response_body = response.read()
             return {
                 "status": response.status,
-                "payload": json.loads(response_body) if response_body else {},
+                "payload": _decode_hmrc_json(response_body),
             }
     except urllib.error.HTTPError as exc:
         error_body = exc.read().decode("utf-8")
@@ -219,6 +298,11 @@ def _hmrc_json_request(url, access_token, method="GET", payload=None, headers=No
             error_payload = {"message": error_body}
         message = error_payload.get("message") or error_payload.get("code") or str(exc)
         raise HmrcApiError(exc.code, message, error_payload) from exc
+    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+        raise HmrcApiError(
+            503,
+            "HMRC could not be reached. No filing or accounting status was changed.",
+        ) from exc
 
 
 def retrieve_vat_obligations(access_token, vrn, from_date, to_date, device_id, public_ip="127.0.0.1", fraud_headers=None):
@@ -279,23 +363,6 @@ def to_hmrc_vat_return_payload(serialized_return):
         "totalAcquisitionsExVAT": serialized_return["totalValueGoodsAcquisitionsExVAT"],
         "finalised": serialized_return["finalised"],
     }
-
-class MockHMRCClient:
-    """Mock client simulating HMRC's MTD for VAT submission endpoint."""
-    @staticmethod
-    def submit_vat_return(payload):
-        # In a real system, this would make an authenticated OAuth2 POST request to:
-        # https://api.service.hmrc.gov.uk/organisations/vat/{vrn}/returns
-        # Returns mock response indicating successful submission.
-        receipt_id = f"HMRC-REC-{uuid.uuid4().hex[:12].upper()}"
-        return {
-            "status": "success",
-            "receipt_id": receipt_id,
-            "processingDate": timezone.now().isoformat(),
-            "paymentIndicator": "BANK" if payload["netVatDue"] > 0 else "DD",
-            "chargeRefNumber": f"CHARGEREF{uuid.uuid4().hex[:8].upper()}"
-        }
-
 
 def serialize_vat_return_9_box(tenant, start_date, end_date):
     """
@@ -385,24 +452,13 @@ def serialize_vat_return_9_box(tenant, start_date, end_date):
 
 
 def submit_vat_return_to_hmrc(tenant, vat_return, period_key="26A1"):
+    """Fail closed for the retired mock VAT submission path.
+
+    Real VAT filing must use the authorised workspace transport, live HMRC
+    obligations, fraud-prevention headers and an actual HMRC response.
     """
-    Submits a finalized/locked VAT Return to the mock HMRC gateway.
-    Updates the VatReturn record with receipt details.
-    """
-    if vat_return.status == "Submitted":
-        raise ValueError("VAT Return has already been submitted to HMRC.")
-
-    payload = serialize_vat_return_9_box(tenant, vat_return.start_date, vat_return.end_date)
-    payload["periodKey"] = period_key
-
-    client = MockHMRCClient()
-    response = client.submit_vat_return(payload)
-
-    with transaction.atomic():
-        vat_return.status = "Submitted"
-        vat_return.hmrc_receipt_id = response["receipt_id"]
-        vat_return.submitted_at = datetime.fromisoformat(response["processingDate"])
-        vat_return.period_key = period_key
-        vat_return.save()
-
-    return response
+    raise HmrcApiError(
+        503,
+        "The legacy mock VAT submission path is disabled. Use the authorised HMRC workspace transport.",
+        {"period_key": period_key, "tenant_id": str(tenant.id)},
+    )

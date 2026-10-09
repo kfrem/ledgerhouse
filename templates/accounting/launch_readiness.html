@@ -1,0 +1,125 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LedgerHouse | Launch readiness</title>
+    <link rel="stylesheet" href="{% static 'accounting/dashboard.css' %}{% if dashboard_css_version %}?v={{ dashboard_css_version }}{% endif %}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Practice navigation">
+        <a class="brand" href="{% url 'practice_dashboard' %}" aria-label="LedgerHouse dashboard">
+            <span class="brand-mark">LH</span>
+            <span>
+                <strong>LedgerHouse</strong>
+                <small>Launch control</small>
+            </span>
+        </a>
+
+        <nav class="nav-list">
+            <a href="{% url 'client_portal' %}"><span>01</span> Client portal</a>
+            <a href="{% url 'practice_dashboard' %}"><span>02</span> Practice</a>
+            <a href="{% url 'practice_clients' %}"><span>03</span> Clients</a>
+            <a href="{% url 'practice_evidence_review' %}"><span>04</span> Evidence</a>
+            <a class="active" href="{% url 'launch_readiness' %}"><span>05</span> Launch</a>
+        </nav>
+
+        <section class="sidebar-panel">
+            <p>Launch gates</p>
+            <strong>{{ passed }} / {{ total }} passed</strong>
+            <small>Local product checks, customer documents, billing setup and external gates.</small>
+        </section>
+    </aside>
+
+    <main class="workspace">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Commercial launch</p>
+                <h1>Launch readiness centre</h1>
+            </div>
+            <div class="topbar-actions">
+                <a class="ghost-button" href="{% url 'privacy_notice' %}">Privacy</a>
+                <a class="ghost-button" href="{% url 'terms_and_conditions' %}">Terms</a>
+                <a class="solid-button" href="{% url 'practice_dashboard' %}">Portfolio</a>
+            </div>
+        </header>
+
+        <section class="summary-grid" aria-label="Launch readiness summary">
+            <article class="metric">
+                <span>Checks passed</span>
+                <strong>{{ passed }}</strong>
+                <small>Locally visible launch controls complete</small>
+            </article>
+            <article class="metric">
+                <span>Total checks</span>
+                <strong>{{ total }}</strong>
+                <small>Product, legal, billing, integrations and deployment</small>
+            </article>
+            <article class="metric">
+                <span>Outstanding</span>
+                <strong>{{ blockers|length }}</strong>
+                <small>Mostly external approval or commercial sign-off</small>
+            </article>
+            <article class="metric">
+                <span>Mode</span>
+                <strong>Local</strong>
+                <small>No public server or live charges are required for this page.</small>
+            </article>
+        </section>
+
+        <section class="content-grid">
+            <article class="surface workbench-surface">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Readiness checklist</p>
+                        <h2>What is complete and what still needs action</h2>
+                    </div>
+                    <span class="status-pill">Controlled launch</span>
+                </div>
+                <div class="launch-section-grid">
+                    {% for section in sections %}
+                    <section class="launch-section">
+                        <h3>{{ section.title }}</h3>
+                        <div class="stack-list">
+                            {% for item in section.items %}
+                            <div class="stack-item">
+                                <span>
+                                    <strong>{{ item.label }}</strong>
+                                    <small>{{ item.detail }}</small>
+                                </span>
+                                <span class="status-pill {% if not item.passed %}warning{% endif %}">{% if item.passed %}Done{% else %}Action{% endif %}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <aside class="right-rail">
+                <article class="surface compliance-card">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">External gates</p>
+                            <h2>Not code-only</h2>
+                        </div>
+                    </div>
+                    <div class="stack-list">
+                        {% for item in blockers %}
+                        <div class="stack-item">
+                            <span>
+                                <strong>{{ item.label }}</strong>
+                                <small>{{ item.detail }}</small>
+                            </span>
+                        </div>
+                        {% empty %}
+                        <div class="empty-state">No outstanding launch blockers are currently visible.</div>
+                        {% endfor %}
+                    </div>
+                </article>
+            </aside>
+        </section>
+    </main>
+</body>
+</html>
